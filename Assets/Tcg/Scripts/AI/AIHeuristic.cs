@@ -5,31 +5,32 @@ using UnityEngine;
 namespace TcgEngine.AI
 {
     /// <summary>
-    /// Values and calculations for various values of the AI decision-making, adjusting these can improve your AI
-    /// Heuristic: Represent the score of a board state, high score favor AI, low score favor the opponent
-    /// Action Score: Represent the score of an individual action, to proritize actions if too many in a single node
-    /// Action Sort Order: Value to determine the order actions should be executed in a single turn to avoid searching same things in different order, executed in ascending order
+    /// AI 决策用到的数值与计算方式，调整这些参数可以改进你的 AI
+    /// Heuristic（启发式）：表示一个棋盘/局面状态的评分，分数高代表有利于 AI，分数低代表有利于对手
+    /// Action Score（行动得分）：表示某一个具体行动的评分，如果在某状态下行动太多，将优先选择分高的行动
+    /// Action Sort Order（行动排序值）：用于决定一个回合内行动执行的顺序，
+    /// 可以避免同一种结果被不同顺序重复搜索；按从小到大顺序执行
     /// </summary>
 
     public class AIHeuristic
     {
-        //---------- Heuristic PARAMS -------------
+        // ---------- 启发式参数 -------------
 
-        public int board_card_value = 20;       //Score of having cards on board
-        public int secret_card_value = 10;       //Score of having cards in secret zone
-        public int hand_card_value = 5;         //Score of having cards in hand
-        public int kill_value = 5;              //Score of killing a card
+        public int board_card_value = 20;      // 场上随从卡的价值分
+        public int secret_card_value = 10;     // 秘密卡区域卡牌的价值分
+        public int hand_card_value = 5;        // 手牌卡牌的价值分
+        public int kill_value = 5;             // 击杀卡牌的价值分
 
-        public int player_hp_value = 4;         //Score per player hp
-        public int card_attack_value = 3;       //Score per board card attack
-        public int card_hp_value = 2;           //Score per board card hp
-        public int card_status_value = 15;       //Score per status on card (multiplied by hvalue of StatusData)
+        public int player_hp_value = 4;        // 每一点玩家血量的价值
+        public int card_attack_value = 3;      // 每一点随从攻击力价值
+        public int card_hp_value = 2;          // 每一点随从生命值价值
+        public int card_status_value = 15;     // 每一个状态的价值（乘以 StatusData 的 hvalue）
 
-        //-----------
+        // ----------
 
-        private int ai_player_id;           //ID of this AI, usually the human is 0 and AI is 1
-        private int ai_level;               //ai level (level 10 is the best, level 1 is the worst)
-        private int heuristic_modifier;     //Randomize heuristic for lower level ai
+        private int ai_player_id;          // 当前 AI 的玩家 ID，通常玩家是 0，AI 是 1
+        private int ai_level;              // AI 等级（10 最强，1 最弱）
+        private int heuristic_modifier;    // 低等级 AI 的启发式随机波动值
         private System.Random random_gen;
 
         public AIHeuristic(int player_id, int level)
@@ -47,19 +48,19 @@ namespace TcgEngine.AI
             return CalculateHeuristic(data, node, aiplayer, oplayer);
         }
 
-        //Calculate full heuristic
-        //Should return a value between -10000 and 10000 (unless its a win)
+        // 计算完整的启发式分值
+        // 应当返回 -10000 到 10000 之间（除非胜利）
         public int CalculateHeuristic(Game data, NodeState node, Player aiplayer, Player oplayer)
         {
             int score = 0;
 
-            //Victories
+            // 胜负判断
             if (aiplayer.IsDead())
-                score += -100000 + node.tdepth * 1000; //Add node depth to seek surviving longest
+                score += -100000 + node.tdepth * 1000; // AI 死了 → 极低分，并加上深度希望“死得更晚”
             if (oplayer.IsDead())
-                score += 100000 - node.tdepth * 1000; //Reduce node depth to seek fastest win
+                score += 100000 - node.tdepth * 1000;  // 对手死了 → 极高分，并减去深度希望“更快赢”
 
-            //Board state
+            // 场面状态
             score += aiplayer.cards_board.Count * board_card_value;
             score += aiplayer.cards_equip.Count * board_card_value;
             score += aiplayer.cards_secret.Count * secret_card_value;
@@ -74,7 +75,7 @@ namespace TcgEngine.AI
             score -= oplayer.kill_count * kill_value;
             score -= oplayer.hp * player_hp_value;
 
-
+            // 随从属性评分
             foreach (Card card in aiplayer.cards_board)
             {
                 score += card.GetAttack() * card_attack_value;
@@ -85,6 +86,7 @@ namespace TcgEngine.AI
                 foreach (CardStatus status in card.ongoing_status)
                     score += status.StatusData.hvalue * card_status_value;
             }
+
             foreach (Card card in oplayer.cards_board)
             {
                 score -= card.GetAttack() * card_attack_value;
@@ -96,22 +98,23 @@ namespace TcgEngine.AI
                     score -= status.StatusData.hvalue * card_status_value;
             }
 
+            // 低等级 AI 加点随机数
             if (heuristic_modifier > 0)
                 score += random_gen.Next(-heuristic_modifier, heuristic_modifier);
 
             return score;
         }
 
-        //This calculates the score of an individual action, instead of the board state
-        //When too many actions are possible in a single node, only the ones with best action score will be evaluated
-        //Make sure to return a positive value
+        // 计算单个行动的评分（而不是整局状态）
+        // 当某状态下行动太多时，只会评估得分较高的行动
+        // 必须返回正值
         public int CalculateActionScore(Game data, AIAction order)
         {
             if (order.type == GameAction.EndTurn)
-                return 0; //Other orders are better
+                return 0;   // 结束回合通常最差
 
             if (order.type == GameAction.CancelSelect)
-                return 0; //Other orders are better
+                return 0;   // 取消通常也不优先
 
             if (order.type == GameAction.CastAbility)
             {
@@ -122,23 +125,25 @@ namespace TcgEngine.AI
             {
                 Card card = data.GetCard(order.card_uid);
                 Card target = data.GetCard(order.target_uid);
-                int ascore = card.GetAttack() >= target.GetHP() ? 300 : 100; //Are you killing the card?
-                int oscore = target.GetAttack() >= card.GetHP() ? -200 : 0; //Are you getting killed?
-                return ascore + oscore + target.GetAttack() * 5;            //Always better to get rid of high-attack cards
+                int ascore = card.GetAttack() >= target.GetHP() ? 300 : 100; // 是否能击杀目标？
+                int oscore = target.GetAttack() >= card.GetHP() ? -200 : 0; // 自己会不会被反杀？
+                return ascore + oscore + target.GetAttack() * 5;           // 优先清高攻击单位
             }
+
             if (order.type == GameAction.AttackPlayer)
             {
                 Card card = data.GetCard(order.card_uid);
                 Player player = data.GetPlayer(order.target_player_id);
-                int ascore = card.GetAttack() >= player.hp ? 500 : 200;     //Are you killing the player?
-                return ascore + (card.GetAttack() * 10) - player.hp;        //Always better to inflict more damage
+                int ascore = card.GetAttack() >= player.hp ? 500 : 200;    // 是否能直接击杀玩家？
+                return ascore + (card.GetAttack() * 10) - player.hp;       // 攻击越高越好
             }
+
             if (order.type == GameAction.PlayCard)
             {
                 Player player = data.GetPlayer(ai_player_id);
                 Card card = data.GetCard(order.card_uid);
                 if (card.CardData.IsBoardCard())
-                    return 200 + (card.GetMana() * 5) - (30 * player.cards_board.Count); //High cost cards are better to play, better to play when not a lot of cards in play
+                    return 200 + (card.GetMana() * 5) - (30 * player.cards_board.Count); // 高费用更好，且场上越少越优先打
                 else if (card.CardData.IsEquipment())
                     return 200 + (card.GetMana() * 5) - (30 * player.cards_equip.Count);
                 else
@@ -150,20 +155,18 @@ namespace TcgEngine.AI
                 return 100;
             }
 
-            return 100; //Other actions are better than End/Cancel
+            return 100; // 其他动作一般也比结束/取消好
         }
 
-        //Within the same turn, actions can only be executed in sorting order, make sure it returns positive value higher than 0 or it wont be sorted
-        //This prevents calculating all possibilities of A->B->C  B->C->A   C->A->B  etc..
-        //If two AIActions with same sorting value, or if sorting value is 0, ai will test all ordering variations (slower)
-        //This would not be necessary in a game with only 1 action per turn (such as chess) but is useful for AI that can perform multiple actions in 1 turn
-        //Ordering could be improved, pretty much random now
+        // 同一回合内，动作只能按排序值执行
+        // 防止计算 A→B→C / B→C→A / C→A→B 这种重复排列
+        // 0 或相同排序值 → AI 会尝试所有排列（变慢）
         public int CalculateActionSort(Game data, AIAction order)
         {
             if (order.type == GameAction.EndTurn)
-                return 0; //End turn can always be performed, 0 means any order
+                return 0; // 结束回合永远可执行
             if (data.selector != SelectorType.None)
-                return 0; //Selector actions not affected by sorting
+                return 0; // 选择器操作不参与排序
 
             Card card = data.GetCard(order.card_uid);
             Card target = order.target_uid != null ? data.GetCard(order.target_uid) : null;
@@ -171,17 +174,17 @@ namespace TcgEngine.AI
 
             int type_sort = 0;
             if (order.type == GameAction.PlayCard && is_spell)
-                type_sort = 1; //Play Spells first
+                type_sort = 1; // 先放法术
             if (order.type == GameAction.CastAbility)
-                type_sort = 2; //Card Abilities second
+                type_sort = 2; // 再用技能
             if (order.type == GameAction.Move)
-                type_sort = 3; //Move third
+                type_sort = 3; // 再移动
             if (order.type == GameAction.Attack)
-                type_sort = 4; //Attacks fourth
+                type_sort = 4; // 再攻击随从
             if (order.type == GameAction.AttackPlayer)
-                type_sort = 5; //Player attacks fifth
+                type_sort = 5; // 再打玩家
             if (order.type == GameAction.PlayCard && !is_spell)
-                type_sort = 7; //Play Characters last
+                type_sort = 7; // 生物最后上
 
             int card_sort = card != null ? (card.Hash % 100) : 0;
             int target_sort = target != null ? (target.Hash % 100) : 0;
@@ -189,7 +192,7 @@ namespace TcgEngine.AI
             return sort;
         }
 
-        //Lower level AI add a random number to their heuristic
+        // 低等级 AI 启发式随机波动范围
         private int GetHeuristicModifier()
         {
             if (ai_level >= 10)
@@ -215,7 +218,7 @@ namespace TcgEngine.AI
             return 0;
         }
 
-        //Check if this node represent one of the players winning
+        // 判断该节点是否代表某方胜利
         public bool IsWin(NodeState node)
         {
             return node.hvalue > 50000 || node.hvalue < -50000;
