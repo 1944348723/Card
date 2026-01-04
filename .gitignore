@@ -1,0 +1,6 @@
+*.csproj
+*.sln
+Assets/Tcg/.VSCodeCounter/
+Library/
+Temp/
+Logs/
