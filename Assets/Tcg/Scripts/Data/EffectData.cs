@@ -6,46 +6,74 @@ using TcgEngine.Gameplay;
 namespace TcgEngine
 {
     /// <summary>
-    /// Base class for all ability effects, override the IsConditionMet function
+    /// 所有技能效果的基类
+    /// 子类可以重写不同的 DoEffect 方法来实现具体的效果逻辑
     /// </summary>
-    
     public class EffectData : ScriptableObject
     {
+        /// <summary>
+        /// 对服务器端游戏逻辑应用效果（无指定目标）
+        /// </summary>
         public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster)
         {
-            //Server side gameplay logic
+            // 服务器端的游戏逻辑
         }
 
+        /// <summary>
+        /// 对指定卡牌目标施加效果
+        /// </summary>
         public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
         {
-            //Server side gameplay logic
+            // 服务器端的游戏逻辑
         }
 
+        /// <summary>
+        /// 对指定玩家目标施加效果
+        /// </summary>
         public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
         {
-            //Server side gameplay logic
+            // 服务器端的游戏逻辑
         }
 
+        /// <summary>
+        /// 对指定格子目标施加效果
+        /// </summary>
         public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster, Slot target)
         {
-            //Server side gameplay logic
+            // 服务器端的游戏逻辑
         }
 
+        /// <summary>
+        /// 对指定卡牌数据目标施加效果（主要用于生成新卡效果）
+        /// </summary>
         public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster, CardData target)
         {
-            //Server side gameplay logic
+            // 服务器端的游戏逻辑
         }
 
+        /// <summary>
+        /// 持续效果，仅作用于卡牌目标
+        /// </summary>
         public virtual void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
         {
-            //Ongoing effect only
+            // 持续效果逻辑
         }
 
+        /// <summary>
+        /// 持续效果，仅作用于玩家目标
+        /// </summary>
         public virtual void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
         {
-            //Ongoing effect only
+            // 持续效果逻辑
         }
 
+        /// <summary>
+        /// 根据运算类型对整数值进行加法或赋值操作
+        /// </summary>
+        /// <param name="original_val">原始值</param>
+        /// <param name="oper">操作类型（Add 或 Set）</param>
+        /// <param name="add_value">要加或赋的新值</param>
+        /// <returns>返回修改后的值</returns>
         public int AddOrSet(int original_val, EffectOperatorInt oper, int add_value)
         {
             if (oper == EffectOperatorInt.Add)
@@ -56,10 +84,13 @@ namespace TcgEngine
         }
     }
 
-
+    /// <summary>
+    /// 整数效果运算类型
+    /// Add = 加法，Set = 直接赋值
+    /// </summary>
     public enum EffectOperatorInt
     {
-        Add,
-        Set,
+        Add, // 加法运算
+        Set, // 直接赋值
     }
 }
