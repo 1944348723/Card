@@ -9,28 +9,30 @@ using TcgEngine;
 namespace TcgEngine.FX
 {
     /// <summary>
-    /// All FX/anims related to a card on the board
+    /// 负责卡牌在场上(Board)的所有特效(FX)和动画
+    /// 包括：出场、死亡、攻击、技能、状态效果、疲惫(Exhausted)等
     /// </summary>
-
     public class BoardCardFX : MonoBehaviour
     {
-        public Material kill_mat;
-        public string kill_mat_fade = "noise_fade";
+        public Material kill_mat;                  // 死亡溶解特效材质
+        public string kill_mat_fade = "noise_fade";// 材质溶解控制属性名
 
-        private BoardCard bcard;
+        private BoardCard bcard;                   // 当前绑定的BoardCard组件
 
-        private ParticleSystem exhausted_fx = null;
+        private ParticleSystem exhausted_fx = null;// 疲惫(Exhausted)状态特效
 
         private Dictionary<StatusType, GameObject> status_fx_list = new Dictionary<StatusType, GameObject>();
+        // 存储状态(Status)特效字典，key = 状态类型，value = 对应的特效GameObject
 
         void Awake()
         {
             bcard = GetComponent<BoardCard>();
-            bcard.onKill += OnKill;
+            bcard.onKill += OnKill; // 卡牌被击杀时触发
         }
 
         void Start()
         {
+            // 注册客户端事件
             GameClient client = GameClient.Get();
             client.onCardMoved += OnMove;
             client.onCardPlayed += OnPlayed;
@@ -41,11 +43,12 @@ namespace TcgEngine.FX
             client.onAbilityTargetCard += OnAbilityEffect;
             client.onAbilityEnd += OnAbilityAfter;
 
-            OnSpawn();
+            OnSpawn(); // 卡牌出场初始化
         }
 
         private void OnDestroy()
         {
+            // 注销客户端事件
             GameClient client = GameClient.Get();
             client.onCardMoved -= OnMove;
             client.onCardPlayed -= OnPlayed;
@@ -64,7 +67,7 @@ namespace TcgEngine.FX
 
             Card card = bcard.GetCard();
 
-            //Status FX
+            // 更新状态效果特效
             List<CardStatus> status_all = card.GetAllStatus();
             foreach (CardStatus status in status_all)
             {
@@ -77,7 +80,7 @@ namespace TcgEngine.FX
                 }
             }
 
-            //Remove status FX
+            // 移除已经不在的状态特效
             List<StatusType> remove_list = new List<StatusType>();
             foreach (KeyValuePair<StatusType, GameObject> pair in status_fx_list)
             {
@@ -91,26 +94,29 @@ namespace TcgEngine.FX
             foreach (StatusType status in remove_list)
                 status_fx_list.Remove(status);
 
-            //Exhausted add/remove
+            // 更新疲惫状态(Exhausted)特效播放/停止
             if (exhausted_fx != null && !exhausted_fx.isPlaying && card.exhausted)
                 exhausted_fx.Play();
             if (exhausted_fx != null && exhausted_fx.isPlaying && !card.exhausted)
                 exhausted_fx.Stop();
         }
 
+        /// <summary>
+        /// 卡牌出场时的特效初始化
+        /// </summary>
         private void OnSpawn()
         {
             CardData icard = bcard.GetCardData();
 
-            //Spawn Audio
+            // 出场音效
             AudioClip audio = icard?.spawn_audio != null ? icard.spawn_audio : AssetData.Get().card_spawn_audio;
             AudioTool.Get().PlaySFX("card_spawn", audio);
 
-            //Spawn FX
+            // 出场特效
             GameObject spawn_fx = icard.spawn_fx != null ? icard.spawn_fx : AssetData.Get().card_spawn_fx;
             FXTool.DoFX(spawn_fx, transform.position);
 
-            //Spawn dissolve fx
+            // URP下死亡溶解特效材质初始化
             if (GameTool.IsURP())
             {
                 SpriteRenderer render = bcard.card_sprite;
@@ -120,7 +126,7 @@ namespace TcgEngine.FX
                 FadeKill(bcard.card_sprite, 1f, 0.5f);
             }
 
-            //Exhausted fx
+            // 疲惫状态特效
             if (AssetData.Get().card_exhausted_fx != null)
             {
                 GameObject efx = Instantiate(AssetData.Get().card_exhausted_fx, transform);
@@ -128,7 +134,7 @@ namespace TcgEngine.FX
                 exhausted_fx = efx.GetComponent<ParticleSystem>();
             }
 
-            //Idle status
+            // 出场闲置特效
             TimeTool.WaitFor(1f, () =>
             {
                 if (icard.idle_fx != null)
@@ -139,6 +145,9 @@ namespace TcgEngine.FX
             });
         }
 
+        /// <summary>
+        /// 卡牌被击杀时触发
+        /// </summary>
         private void OnKill()
         {
             StartCoroutine(KillRoutine());
@@ -150,41 +159,53 @@ namespace TcgEngine.FX
 
             CardData icard = bcard.GetCardData();
 
-            //Death FX
+            // 死亡特效
             GameObject death_fx = icard.death_fx != null ? icard.death_fx : AssetData.Get().card_destroy_fx;
             FXTool.DoFX(death_fx, transform.position);
 
-            //Death audio
+            // 死亡音效
             AudioClip audio = icard?.death_audio != null ? icard.death_audio : AssetData.Get().card_destroy_audio;
             AudioTool.Get().PlaySFX("card_spawn", audio);
 
-            //Death dissolve fx
+            // 死亡溶解特效
             if (GameTool.IsURP())
             {
                 FadeKill(bcard.card_sprite, 0f, 0.5f);
             }
         }
-		
-		private void FadeSetVal(SpriteRenderer render, float val)
+
+        /// <summary>
+        /// 材质溶解特效初始值设置
+        /// </summary>
+        private void FadeSetVal(SpriteRenderer render, float val)
         {
             render.material = kill_mat;
             render.material.SetFloat(kill_mat_fade, val);
         }
 
+        /// <summary>
+        /// 材质溶解动画
+        /// </summary>
         private void FadeKill(SpriteRenderer render, float val, float duration)
         {
             AnimMatFX anim = AnimMatFX.Create(render.gameObject, render.material);
             anim.SetFloat(kill_mat_fade, val, duration);
         }
 
+        /// <summary>
+        /// 卡牌移动事件
+        /// </summary>
         private void OnMove(Card card, Slot slot)
         {
             AudioTool.Get().PlaySFX("card_move", AssetData.Get().card_move_audio);
         }
 
+        /// <summary>
+        /// 卡牌被打出事件
+        /// </summary>
         private void OnPlayed(Card card, Slot slot)
         {
-            //Playing equipment
+            // 如果是装备卡，播放装备特效
             Card ecard = bcard?.GetEquipCard();
             if (ecard != null && card.uid == ecard.uid && transform != null)
             {
@@ -193,6 +214,9 @@ namespace TcgEngine.FX
             }
         }
 
+        /// <summary>
+        /// 卡牌受伤事件
+        /// </summary>
         private void OnCardDamaged(Card target, int damage)
         {
             Card card = bcard.GetCard();
@@ -202,6 +226,9 @@ namespace TcgEngine.FX
             }
         }
 
+        /// <summary>
+        /// 攻击卡牌事件
+        /// </summary>
         private void OnAttack(Card attacker, Card target)
         {
             Card card = bcard.GetCard();
@@ -214,16 +241,15 @@ namespace TcgEngine.FX
                 BoardCard btarget = BoardCard.Get(target.uid);
                 if (btarget != null)
                 {
-                    //Card charge into target
-                    ChargeInto(btarget);
+                    ChargeInto(btarget); // 冲向目标
 
-                    //Attack FX and Audio
+                    // 攻击特效和音效
                     GameObject fx = icard.attack_fx != null ? icard.attack_fx : AssetData.Get().card_attack_fx;
                     FXTool.DoSnapFX(fx, transform);
                     AudioClip audio = icard?.attack_audio != null ? icard.attack_audio : AssetData.Get().card_attack_audio;
                     AudioTool.Get().PlaySFX("card_attack", audio);
 
-                    //Equip FX
+                    // 装备卡攻击特效
                     Card ecard = bcard.GetEquipCard();
                     if (ecard != null)
                     {
@@ -232,9 +258,11 @@ namespace TcgEngine.FX
                     }
                 }
             }
-
         }
 
+        /// <summary>
+        /// 攻击玩家事件
+        /// </summary>
         private void OnAttackPlayer(Card attacker, Player player)
         {
             if (attacker == null || player == null)
@@ -247,12 +275,12 @@ namespace TcgEngine.FX
                 CardData icard = bcard.GetCardData();
                 BoardSlotPlayer zone = BoardSlotPlayer.Get(is_other);
 
-                ChargeIntoPlayer(zone);
+                ChargeIntoPlayer(zone); // 冲向玩家
 
                 AudioClip audio = icard?.attack_audio != null ? icard.attack_audio : AssetData.Get().card_attack_audio;
                 AudioTool.Get().PlaySFX("card_attack", audio);
 
-                //Equip FX
+                // 装备卡攻击特效
                 Card ecard = bcard.GetEquipCard();
                 if (ecard != null)
                 {
@@ -262,6 +290,9 @@ namespace TcgEngine.FX
             }
         }
 
+        /// <summary>
+        /// 受伤特效
+        /// </summary>
         private void DamageFX(Transform target, int value, float delay = 0.5f)
         {
             TimeTool.WaitFor(delay, () =>
@@ -271,6 +302,9 @@ namespace TcgEngine.FX
             });
         }
 
+        /// <summary>
+        /// 冲向目标卡牌的动画
+        /// </summary>
         private void ChargeInto(BoardCard target)
         {
             if (target != null)
@@ -280,7 +314,7 @@ namespace TcgEngine.FX
                 CardData icard = target.GetCardData();
                 TimeTool.WaitFor(0.25f, () =>
                 {
-                    //Damage fx and audio
+                    // 伤害特效和音效
                     GameObject prefab = icard.damage_fx ? icard.damage_fx : AssetData.Get().card_damage_fx;
                     AudioClip audio = icard.damage_audio ? icard.damage_audio : AssetData.Get().card_damage_audio;
                     FXTool.DoFX(prefab, target.transform.position);
@@ -289,6 +323,9 @@ namespace TcgEngine.FX
             }
         }
 
+        /// <summary>
+        /// 冲向玩家区域的动画
+        /// </summary>
         private void ChargeIntoPlayer(BoardSlotPlayer target)
         {
             if (target != null)
@@ -297,7 +334,6 @@ namespace TcgEngine.FX
 
                 TimeTool.WaitFor(0.25f, () =>
                 {
-                    //Damage fx and audio
                     FXTool.DoFX(AssetData.Get().player_damage_fx, target.transform.position);
                     AudioClip audio = AssetData.Get().player_damage_audio;
                     AudioTool.Get().PlaySFX("card_hit", audio);
@@ -305,6 +341,9 @@ namespace TcgEngine.FX
             }
         }
 
+        /// <summary>
+        /// 冲向某个GameObject的动画
+        /// </summary>
         private void ChargeInto(GameObject target)
         {
             if (target != null)
@@ -327,6 +366,9 @@ namespace TcgEngine.FX
             }
         }
 
+        /// <summary>
+        /// 技能释放开始事件
+        /// </summary>
         private void OnAbilityStart(AbilityData iability, Card caster)
         {
             if (iability != null && caster != null)
@@ -341,15 +383,12 @@ namespace TcgEngine.FX
 
         private void OnAbilityAfter(AbilityData iability, Card caster)
         {
-            if (iability != null && caster != null)
-            {
-                if (caster.uid == bcard.GetCardUID())
-                {
-
-                }
-            }
+            // 技能释放结束后处理，可留空
         }
 
+        /// <summary>
+        /// 技能对目标卡牌生效事件
+        /// </summary>
         private void OnAbilityEffect(AbilityData iability, Card caster, Card target)
         {
             if (iability != null && caster != null && target != null)
@@ -372,6 +411,9 @@ namespace TcgEngine.FX
             }
         }
 
+        /// <summary>
+        /// 获取技能特效源位置
+        /// </summary>
         private Transform GetFXSource(Card caster)
         {
             if (caster.CardData.IsBoardCard())
