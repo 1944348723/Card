@@ -10,73 +10,73 @@ using TcgEngine.FX;
 namespace TcgEngine.Client
 {
     /// <summary>
-    /// Represents the visual aspect of a card on the board.
-    /// Will take the data from Card.cs and display it
+    /// 表示棋盘上卡牌的视觉表现。
+    /// 会读取 Card.cs 中的数据，并在界面上显示卡牌信息。
     /// </summary>
 
     public class BoardCard : MonoBehaviour
     {
-        public SpriteRenderer card_sprite;
-        public SpriteRenderer card_glow;
-        public SpriteRenderer card_shadow;
+        public SpriteRenderer card_sprite;    // 卡牌主体精灵
+        public SpriteRenderer card_glow;      // 卡牌发光效果
+        public SpriteRenderer card_shadow;    // 卡牌阴影效果
 
-        public Image armor_icon;
-        public Text armor;
+        public Image armor_icon;              // 护甲图标
+        public Text armor;                    // 护甲数值文本
 
-        public CanvasGroup status_group;
-        public Text status_text;
+        public CanvasGroup status_group;      // 状态栏 CanvasGroup，用于控制透明度
+        public Text status_text;              // 状态栏文本
 
-        public BoardCardEquip equipment;
+        public BoardCardEquip equipment;      // 卡牌装备显示对象
 
-        public AbilityButton[] buttons;
+        public AbilityButton[] buttons;       // 卡牌技能按钮数组
 
-        public Color glow_ally;
-        public Color glow_enemy;
+        public Color glow_ally;               // 友方卡牌发光颜色
+        public Color glow_enemy;              // 敌方卡牌发光颜色
 
-        public UnityAction onKill;
+        public UnityAction onKill;            // 卡牌死亡回调事件
 
-        private CardUI card_ui;
-        private BoardCardFX card_fx;
-        private Canvas canvas;
+        private CardUI card_ui;               // 卡牌UI组件
+        private BoardCardFX card_fx;          // 卡牌特效组件
+        private Canvas canvas;                // 卡牌Canvas组件
 
-        private string card_uid = "";
-        private bool destroyed = false;
-        private bool focus = false;
-        private float timer = 0f;
-        private float status_alpha_target = 0f;
-        private float delayed_damage_timer = 0f;
-        private int prev_hp = 0;
+        private string card_uid = "";         // 卡牌唯一ID
+        private bool destroyed = false;       // 是否已被销毁
+        private bool focus = false;           // 是否获得焦点或鼠标悬停
+        private float timer = 0f;             // 内部计时器
+        private float status_alpha_target = 0f;// 状态栏目标透明度
+        private float delayed_damage_timer = 0f;// 延迟显示伤害计时器
+        private int prev_hp = 0;              // 上一帧HP，用于延迟显示伤害
 
-        private bool back_to_hand;
-        private Vector3 back_to_hand_target;
+        private bool back_to_hand;            // 是否回手动画
+        private Vector3 back_to_hand_target;  // 回手目标位置
 
-        private static List<BoardCard> card_list = new List<BoardCard>();
+        private static List<BoardCard> card_list = new List<BoardCard>(); // 所有BoardCard实例列表
 
         void Awake()
         {
-            card_list.Add(this);
-            card_ui = GetComponent<CardUI>();
-            card_fx = GetComponent<BoardCardFX>();
-            canvas = GetComponentInChildren<Canvas>();
-            card_glow.color = new Color(card_glow.color.r, card_glow.color.g, card_glow.color.b, 0f);
-            canvas.gameObject.SetActive(false);
+            card_list.Add(this);  // 添加到全局卡牌列表
+            card_ui = GetComponent<CardUI>();      // 获取卡牌UI组件
+            card_fx = GetComponent<BoardCardFX>(); // 获取卡牌特效组件
+            canvas = GetComponentInChildren<Canvas>(); // 获取子Canvas
+            card_glow.color = new Color(card_glow.color.r, card_glow.color.g, card_glow.color.b, 0f); // 初始发光透明
+            canvas.gameObject.SetActive(false);    // 初始隐藏Canvas
             status_alpha_target = 0f;
 
             if (equipment != null)
-                equipment.Hide();
+                equipment.Hide();  // 隐藏装备显示
 
             if (status_group != null)
-                status_group.alpha = 0f;
+                status_group.alpha = 0f; // 隐藏状态栏
         }
 
         void OnDestroy()
         {
-            card_list.Remove(this);
+            card_list.Remove(this); // 移除全局卡牌列表
         }
 
         private void Start()
         {
-            //Random slight rotation
+            // 随机微小旋转，让卡牌排列更自然
             Vector3 board_rot = GameBoard.Get().GetAngles();
             transform.rotation = Quaternion.Euler(board_rot.x, board_rot.y, board_rot.z + Random.Range(-1f, 1f));
         }
@@ -86,72 +86,76 @@ namespace TcgEngine.Client
             if (!GameClient.Get().IsReady())
                 return;
 
-            delayed_damage_timer -= Time.deltaTime;
-            timer += Time.deltaTime;
+            delayed_damage_timer -= Time.deltaTime;  // 更新延迟伤害计时
+            timer += Time.deltaTime;                  // 更新通用计时器
             if (timer > 0.15f && !destroyed && !canvas.gameObject.activeSelf)
-                canvas.gameObject.SetActive(true);
+                canvas.gameObject.SetActive(true);   // 延迟显示Canvas
 
-            PlayerControls controls = PlayerControls.Get();
-            Game data = GameClient.Get().GetGameData();
-            Player player = GameClient.Get().GetPlayer();
-            Card card = data.GetCard(card_uid);
+            PlayerControls controls = PlayerControls.Get(); // 获取玩家操作
+            Game data = GameClient.Get().GetGameData();     // 获取游戏数据
+            Player player = GameClient.Get().GetPlayer();   // 获取自己玩家信息
+            Card card = data.GetCard(card_uid);            // 获取当前卡牌数据
 
             if (!destroyed)
             {
-                card_ui.SetCard(card);
-                card_ui.SetHP(prev_hp);
+                card_ui.SetCard(card);        // 更新卡牌UI
+                card_ui.SetHP(prev_hp);       // 显示上一帧HP，实现延迟伤害效果
             }
 
-            //Save Previous HP
+            // 保存上一帧HP值，如果没有延迟伤害
             if (!IsDamagedDelayed())
                 prev_hp = card.GetHP();
 
-            bool selected = controls.GetSelected() == this;
-            Vector3 targ_pos = GetTargetPos();
-            float speed = 12f;
+            bool selected = controls.GetSelected() == this;    // 是否被选中
+            Vector3 targ_pos = GetTargetPos();                // 获取卡牌目标位置
+            float speed = 12f;                                // 平滑移动速度
 
-            transform.position = Vector3.MoveTowards(transform.position, targ_pos, speed * Time.deltaTime);
+            transform.position = Vector3.MoveTowards(transform.position, targ_pos, speed * Time.deltaTime); // 平滑移动到目标位置
 
+            // 计算发光目标透明度
             float target_alpha = IsFocus() || selected ? 1f : 0f;
             if (destroyed || timer < 1f)
                 target_alpha = 0f;
             if (equipment != null && equipment.IsFocus())
                 target_alpha = 0f;
 
+            // 设置发光颜色
             Color ccolor = player.player_id == card.player_id ? glow_ally : glow_enemy;
             float calpha = Mathf.MoveTowards(card_glow.color.a, target_alpha * ccolor.a, 4f * Time.deltaTime);
             card_glow.color = new Color(ccolor.r, ccolor.g, ccolor.b, calpha);
-            card_shadow.enabled = !destroyed && timer > 0.4f;
-            card_sprite.color = card.HasStatus(StatusType.Stealth) ? Color.gray : Color.white;
-            card_ui.hp.color = (destroyed || card.damage > 0) ? Color.yellow : Color.white;
 
-            //armor
+            card_shadow.enabled = !destroyed && timer > 0.4f; // 阴影显示
+            card_sprite.color = card.HasStatus(StatusType.Stealth) ? Color.gray : Color.white; // 潜行状态显示灰色
+            card_ui.hp.color = (destroyed || card.damage > 0) ? Color.yellow : Color.white;   // 受伤显示黄色
+
+            // 护甲显示
             int armor_val = card.GetStatusValue(StatusType.Armor);
             armor.text = armor_val.ToString();
             armor.enabled = armor_val > 0;
             armor_icon.enabled = armor_val > 0;
 
-            //Update card image
+            // 更新卡牌图片
             Sprite sprite = card.CardData.GetBoardArt(card.VariantData);
             if (sprite != card_sprite.sprite)
                 card_sprite.sprite = sprite;
 
-            //Update frame image
+            // 更新卡牌框架图片
             Sprite frame = card.VariantData.frame_board;
             if (frame != null && card_ui.frame_image != null)
                 card_ui.frame_image.sprite = frame;
 
-            //Equipment
+            // 装备显示
             if (equipment != null)
             {
                 Card equip = data.GetEquipCard(card.equipped_uid);
                 equipment.SetEquip(equip);
             }
 
-            //Ability buttons
+            // 隐藏技能按钮
             foreach (AbilityButton button in buttons)
                 button.Hide();
 
+            // 显示选中卡牌的技能按钮
             if (selected && card.player_id == player.player_id)
             {
                 int index = 0;
@@ -163,13 +167,14 @@ namespace TcgEngine.Client
                         if (index < buttons.Length)
                         {
                             AbilityButton button = buttons[index];
-                            button.SetAbility(card, iability);
-                            button.SetInteractable(data.CanCastAbility(card, iability));
+                            button.SetAbility(card, iability);                          // 设置技能按钮数据
+                            button.SetInteractable(data.CanCastAbility(card, iability)); // 设置按钮是否可用
                         }
                         index++;
                     }
                 }
 
+                // 显示装备技能
                 Card equip = data.GetEquipCard(card.equipped_uid);
                 if (equip != null)
                 {
@@ -190,11 +195,12 @@ namespace TcgEngine.Client
                 }
             }
 
-            //Status bar
+            // 更新状态栏透明度
             if (status_group != null)
                 status_group.alpha = Mathf.MoveTowards(status_group.alpha, status_alpha_target, 5f * Time.deltaTime);
         }
 
+        // 获取卡牌目标位置（槽位或回手动画目标）
         private Vector3 GetTargetPos()
         {
             Game data = GameClient.Get().GetGameData();
@@ -213,6 +219,7 @@ namespace TcgEngine.Client
             return transform.position;
         }
 
+        // 设置卡牌数据
         public void SetCard(Card card)
         {
             this.card_uid = card.uid;
@@ -223,20 +230,22 @@ namespace TcgEngine.Client
             CardData icard = CardData.Get(card.card_id);
             if (icard)
             {
-                card_ui.SetCard(card);
-                card_sprite.sprite = icard.GetBoardArt(card.VariantData);
-                armor.enabled = false;
+                card_ui.SetCard(card);                             // 设置UI显示
+                card_sprite.sprite = icard.GetBoardArt(card.VariantData); // 设置卡牌图片
+                armor.enabled = false;                              // 隐藏护甲
                 armor_icon.enabled = false;
-                status_alpha_target = 0f;
+                status_alpha_target = 0f;                           // 隐藏状态条
             }
         }
 
+        // 设置渲染顺序
         public void SetOrder(int order)
         {
             card_sprite.sortingOrder = order;
             canvas.sortingOrder = order + 1;
         }
 
+        // 销毁卡牌
         public void Destroy()
         {
             if (!destroyed)
@@ -251,12 +260,12 @@ namespace TcgEngine.Client
                 card_glow.enabled = false;
                 card_shadow.enabled = false;
 
-                SetOrder(card_sprite.sortingOrder - 2);
-                Destroy(gameObject, 1.3f);
+                SetOrder(card_sprite.sortingOrder - 2);  // 调整渲染顺序
+                Destroy(gameObject, 1.3f);              // 延迟销毁
 
                 TimeTool.WaitFor(0.8f, () =>
                 {
-                    canvas.gameObject.SetActive(false);
+                    canvas.gameObject.SetActive(false); // 隐藏UI
                 });
 
                 GameBoard board = GameBoard.Get();
@@ -264,7 +273,7 @@ namespace TcgEngine.Client
                 {
                     back_to_hand = true;
                     back_to_hand_target = player.player_id == GameClient.Get().GetPlayerID() ? -board.transform.up : board.transform.up;
-                    back_to_hand_target = back_to_hand_target * 10f;
+                    back_to_hand_target = back_to_hand_target * 10f; // 设置回手动画方向和距离
                 }
 
                 if (!back_to_hand)
@@ -274,11 +283,11 @@ namespace TcgEngine.Client
                 }
 
                 if (onKill != null)
-                    onKill.Invoke();
+                    onKill.Invoke(); // 调用死亡回调
             }
         }
 
-        //Offset the HP visuals by a value so the HP dont go down before end of animation (like a projectile)
+        // 延迟显示伤害
         public void DelayDamage(int damage, float duration = 1f)
         {
             if (damage != 0)
@@ -287,18 +296,20 @@ namespace TcgEngine.Client
             }
         }
 
+        // 判断是否存在延迟伤害
         public bool IsDamagedDelayed()
         {
             return delayed_damage_timer > 0f;
         }
 
+        // 显示状态栏文字
         private void ShowStatusBar()
         {
             Card card = GetCard();
             if (card != null && status_text != null && !destroyed)
             {
-                string stxt = GetStatusText();
-                string ttxt = GetTraitText();
+                string stxt = GetStatusText();  // 状态文本
+                string ttxt = GetTraitText();   // 特质文本
 
                 if (stxt.Length > 0 && ttxt.Length > 0)
                     status_text.text = ttxt + ", " + stxt;
@@ -307,9 +318,14 @@ namespace TcgEngine.Client
             }
 
             bool show_status = status_text != null && status_text.text.Length > 0;
-            status_alpha_target = show_status ? 1f : 0f;
+            status_alpha_target = show_status ? 1f : 0f; // 控制状态栏显示
         }
 
+
+        /// <summary>
+        /// 获取卡牌的状态文本（如：护甲、沉默、冻结等）
+        /// 将所有状态拼接成一个字符串，用于显示在状态栏
+        /// </summary>
         public string GetStatusText()
         {
             Card card = GetCard();
@@ -329,6 +345,10 @@ namespace TcgEngine.Client
             return txt;
         }
 
+        /// <summary>
+        /// 获取卡牌的特质文本（如：嘲讽、吸血等）
+        /// 将所有特质拼接成一个字符串，用于显示在状态栏
+        /// </summary>
         public string GetTraitText()
         {
             Card card = GetCard();
@@ -348,21 +368,34 @@ namespace TcgEngine.Client
             return txt;
         }
 
+        /// <summary>
+        /// 判断卡牌是否已死亡（已销毁）
+        /// </summary>
         public bool IsDead()
         {
             return destroyed;
         }
 
+        /// <summary>
+        /// 判断该卡牌是否当前处于焦点状态（鼠标悬停或选中）
+        /// </summary>
         public bool IsFocus()
         {
             return focus;
         }
 
+        /// <summary>
+        /// 判断装备卡是否处于焦点状态
+        /// </summary>
         public bool IsEquipFocus()
         {
             return equipment != null && equipment.IsFocus();
         }
 
+        /// <summary>
+        /// 鼠标进入卡牌时触发
+        /// 显示状态栏，如果在移动端或UI被打开则不处理
+        /// </summary>
         public void OnMouseEnter()
         {
             if (GameUI.IsUIOpened())
@@ -375,12 +408,20 @@ namespace TcgEngine.Client
             ShowStatusBar();
         }
 
+        /// <summary>
+        /// 鼠标离开卡牌时触发
+        /// 隐藏状态栏
+        /// </summary>
         public void OnMouseExit()
         {
             focus = false;
             status_alpha_target = 0f;
         }
 
+        /// <summary>
+        /// 鼠标按下卡牌时触发
+        /// 选中卡牌，如果在移动端则同时显示状态栏
+        /// </summary>
         public void OnMouseDown()
         {
             if (GameUI.IsOverUILayer("UI"))
@@ -395,11 +436,18 @@ namespace TcgEngine.Client
             }
         }
 
+        /// <summary>
+        /// 鼠标松开卡牌时触发（目前未实现功能）
+        /// </summary>
         public void OnMouseUp()
         {
 
         }
 
+        /// <summary>
+        /// 鼠标悬停卡牌时触发
+        /// 右键点击时选中卡牌右键操作
+        /// </summary>
         public void OnMouseOver()
         {
             if (Input.GetMouseButtonDown(1))
@@ -408,12 +456,17 @@ namespace TcgEngine.Client
             }
         }
 
+        /// <summary>
+        /// 获取卡牌唯一ID
+        /// </summary>
         public string GetCardUID()
         {
             return card_uid;
         }
 
-        //Return main card (not equip)
+        /// <summary>
+        /// 获取主卡（非装备卡）
+        /// </summary>
         public Card GetCard()
         {
             Game data = GameClient.Get().GetGameData();
@@ -421,7 +474,9 @@ namespace TcgEngine.Client
             return card;
         }
 
-        //Return equip card
+        /// <summary>
+        /// 获取装备卡
+        /// </summary>
         public Card GetEquipCard()
         {
             Game data = GameClient.Get().GetGameData();
@@ -430,14 +485,19 @@ namespace TcgEngine.Client
             return equip;
         }
 
-        //Return either main or equip card based on which one is focused
+        /// <summary>
+        /// 根据焦点返回当前焦点卡牌（主卡或装备卡）
+        /// </summary>
         public Card GetFocusCard()
         {
             if (IsEquipFocus())
                 return GetEquipCard();
             return GetCard();
         }
-        
+
+        /// <summary>
+        /// 获取卡牌数据（CardData）
+        /// </summary>
         public CardData GetCardData()
         {
             Card card = GetCard();
@@ -446,18 +506,30 @@ namespace TcgEngine.Client
             return null;
         }
 
+        /// <summary>
+        /// 获取卡牌所在格子
+        /// </summary>
         public Slot GetSlot()
         {
             return GetCard().slot;
         }
 
+        /// <summary>
+        /// 获取卡牌的FX组件
+        /// </summary>
         public BoardCardFX GetCardFX()
         {
             return card_fx;
         }
 
+        /// <summary>
+        /// 获取卡牌的CardData属性
+        /// </summary>
         public CardData CardData { get { return GetCardData(); } }
 
+        /// <summary>
+        /// 获取指定玩家在棋盘上的卡牌数量
+        /// </summary>
         public static int GetNbCardsBoardPlayer(int player_id)
         {
             int nb = 0;
@@ -469,6 +541,9 @@ namespace TcgEngine.Client
             return nb;
         }
 
+        /// <summary>
+        /// 获取离指定位置最近的敌方卡牌
+        /// </summary>
         public static BoardCard GetNearestPlayer(Vector3 pos, int skip_player_id, BoardCard skip, float range = 2f)
         {
             BoardCard nearest = null;
@@ -485,6 +560,9 @@ namespace TcgEngine.Client
             return nearest;
         }
 
+        /// <summary>
+        /// 获取离指定位置最近的卡牌（可包括己方）
+        /// </summary>
         public static BoardCard GetNearest(Vector3 pos, BoardCard skip, float range = 2f)
         {
             BoardCard nearest = null;
@@ -501,6 +579,9 @@ namespace TcgEngine.Client
             return nearest;
         }
 
+        /// <summary>
+        /// 获取当前被鼠标或装备焦点选中的卡牌
+        /// </summary>
         public static BoardCard GetFocus()
         {
             if (GameUI.IsOverUI())
@@ -514,6 +595,9 @@ namespace TcgEngine.Client
             return null;
         }
 
+        /// <summary>
+        /// 取消所有卡牌的焦点状态
+        /// </summary>
         public static void UnfocusAll()
         {
             foreach (BoardCard card in card_list)
@@ -523,6 +607,9 @@ namespace TcgEngine.Client
             }
         }
 
+        /// <summary>
+        /// 根据卡牌UID获取BoardCard实例
+        /// </summary>
         public static BoardCard Get(string uid)
         {
             foreach (BoardCard card in card_list)
@@ -533,9 +620,13 @@ namespace TcgEngine.Client
             return null;
         }
 
+        /// <summary>
+        /// 获取所有BoardCard实例
+        /// </summary>
         public static List<BoardCard> GetAll()
         {
             return card_list;
         }
+
     }
 }

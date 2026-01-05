@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_PixelRect:
     serializedVersion: 2
-    x: -2560
-    y: -122
+    x: 0
+    y: 43
     width: 2560
     height: 1357
   m_ShowMode: 4
@@ -374,8 +374,8 @@ MonoBehaviour:
     m_Tooltip: 
   m_Pos:
     serializedVersion: 2
-    x: -2560
-    y: -92
+    x: 0
+    y: 73
     width: 424
     height: 723
   m_SerializedDataModeController:
@@ -438,8 +438,8 @@ MonoBehaviour:
     m_Tooltip: 
   m_Pos:
     serializedVersion: 2
-    x: -2135
-    y: -92
+    x: 425
+    y: 73
     width: 1559
     height: 723
   m_SerializedDataModeController:
@@ -1237,8 +1237,8 @@ MonoBehaviour:
     m_Tooltip: 
   m_Pos:
     serializedVersion: 2
-    x: -2560
-    y: 652
+    x: 0
+    y: 817
     width: 1985
     height: 542
   m_SerializedDataModeController:
@@ -1272,8 +1272,8 @@ MonoBehaviour:
     m_Tooltip: 
   m_Pos:
     serializedVersion: 2
-    x: -574
-    y: -92
+    x: 1986
+    y: 73
     width: 573
     height: 1286
   m_SerializedDataModeController:
