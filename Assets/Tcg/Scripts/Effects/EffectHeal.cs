@@ -6,21 +6,25 @@ using TcgEngine.Gameplay;
 namespace TcgEngine
 {
     /// <summary>
-    /// Effects that heals a card or player (hp)
-    /// It cannot restore more than the original hp, use AddStats to go beyond original
+    /// 效果说明：
+    /// 为卡牌或玩家恢复生命值（HP）。
+    /// - 恢复量不会超过原始最大生命值；
+    /// - 如果需要超过最大生命值，请使用 AddStats 效果。
     /// </summary>
 
     [CreateAssetMenu(fileName = "effect", menuName = "TcgEngine/Effect/Heal", order = 10)]
     public class EffectHeal : EffectData
     {
+        // 对玩家执行治疗
         public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
         {
-            logic.HealPlayer(target, ability.value);
+            logic.HealPlayer(target, ability.value);  // 恢复目标玩家 HP
         }
 
+        // 对卡牌执行治疗
         public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
         {
-            logic.HealCard(target, ability.value);
+            logic.HealCard(target, ability.value);    // 恢复目标卡牌 HP
         }
 
     }
