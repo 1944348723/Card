@@ -6,21 +6,12 @@ using TcgEngine;
 
 namespace TcgEngine.UI
 {
-    /// <summary>
-    /// UI element that shows a value with a progress bar
-    /// </summary>
-
     public class ProgressBar : MonoBehaviour
     {
         public float value;
         public float value_max;
 
         public Image fill;
-
-        void Start()
-        {
-
-        }
 
         void Update()
         {

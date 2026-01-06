@@ -9,34 +9,35 @@ using UnityEngine.EventSystems;
 namespace TcgEngine.UI
 {
     /// <summary>
-    /// Main UI script for all the game scene UI
+    /// 游戏场景主UI脚本
+    /// 管理游戏内的所有UI元素
     /// </summary>
-
     public class GameUI : MonoBehaviour
     {
-        public Canvas game_canvas;
-        public Canvas panel_canvas;
-        public Canvas top_canvas;
-        public UIPanel menu_panel;
-        public Text quit_btn;
+        public Canvas game_canvas;       // 游戏主画布
+        public Canvas panel_canvas;      // 面板画布
+        public Canvas top_canvas;        // 顶层画布
+        public UIPanel menu_panel;       // 菜单面板
+        public Text quit_btn;            // 退出按钮文本
 
-        [Header("Turn Area")]
-        public Text turn_count;
-        public Text turn_timer;
-        public Button end_turn_button;
-        public Animator timeout_animator;
-        public AudioClip timeout_audio;
+        [Header("回合区域")]
+        public Text turn_count;          // 回合数显示
+        public Text turn_timer;          // 回合计时显示
+        public Button end_turn_button;   // 结束回合按钮
+        public Animator timeout_animator; // 超时动画
+        public AudioClip timeout_audio;   // 超时音效
 
-        private float selector_timer = 0f;
-        private float end_turn_timer = 0f;
-        private int prev_time_val = 0;
+        private float selector_timer = 0f;   // 选择器刷新计时
+        private float end_turn_timer = 0f;   // 结束回合按钮冷却计时
+        private int prev_time_val = 0;       // 上一帧的时间值
 
-        private static GameUI instance;
+        private static GameUI instance;      // 单例
 
         void Awake()
         {
             instance = this;
 
+            // 设置画布摄像机
             if (game_canvas.worldCamera == null)
                 game_canvas.worldCamera = Camera.main;
             if (panel_canvas.worldCamera == null)
@@ -60,11 +61,11 @@ namespace TcgEngine.UI
         void Update()
         {
             Game data = GameClient.Get().GetGameData();
-			bool is_connecting = data == null || data.state == GameState.Connecting;
+            bool is_connecting = data == null || data.state == GameState.Connecting;
             bool connection_lost = !is_connecting && !GameClient.Get().IsReady();
             ConnectionPanel.Get().SetVisible(connection_lost);
 
-            //Menu
+            // 菜单切换
             if (Input.GetKeyDown(KeyCode.Escape))
                 menu_panel.Toggle();
 
@@ -77,17 +78,17 @@ namespace TcgEngine.UI
             end_turn_timer += Time.deltaTime;
             selector_timer += Time.deltaTime;
 
-            //Timer
+            // 回合计时显示
             turn_count.text = "Turn " + data.turn_count.ToString();
             turn_timer.enabled = data.turn_timer > 0f;
             turn_timer.text = Mathf.RoundToInt(data.turn_timer).ToString();
             turn_timer.enabled = data.turn_timer < 999f;
 
-            //Simulate timer
+            // 模拟回合计时
             if (data.state == GameState.Play && data.turn_timer > 0f)
                 data.turn_timer -= Time.deltaTime;
 
-            //Timer warning
+            // 回合剩余时间警告
             if (data.state == GameState.Play)
             {
                 int val = Mathf.RoundToInt(data.turn_timer);
@@ -97,7 +98,7 @@ namespace TcgEngine.UI
                 prev_time_val = val;
             }
 
-            //Show selector panels
+            // 显示选择器面板
             foreach (SelectorPanel panel in SelectorPanel.GetAll())
             {
                 bool should_show = panel.ShouldShow();
@@ -115,14 +116,16 @@ namespace TcgEngine.UI
                 }
             }
 
-            //Hide
+            // 隐藏选择器
             if (!yourturn && data.phase != GamePhase.Mulligan)
             {
                 SelectorPanel.HideAll();
             }
-
         }
 
+        /// <summary>
+        /// 回合计时闪烁提示效果
+        /// </summary>
         private void PulseFX()
         {
             timeout_animator?.SetTrigger("pulse");
@@ -131,11 +134,12 @@ namespace TcgEngine.UI
 
         private void OnGameStart()
         {
-            
+            // 游戏开始时的逻辑
         }
 
         private void OnNewTurn(int player_id)
         {
+            // 新回合时隐藏选择器
             CardSelector.Get().Hide();
             SelectTargetUI.Get().Hide();
         }
@@ -146,7 +150,7 @@ namespace TcgEngine.UI
                 return;
 
             GameClient.Get().EndTurn();
-            end_turn_timer = 0f; //Disable button immediately (dont wait for refresh)
+            end_turn_timer = 0f; // 立即禁用按钮
         }
 
         public void OnClickRestart()
@@ -194,14 +198,19 @@ namespace TcgEngine.UI
             GameClient.Get().SetObserverMode(other);
         }
 
+        /// <summary>
+        /// 判断是否有UI打开
+        /// </summary>
         public static bool IsUIOpened()
         {
             return CardSelector.Get().IsVisible() || EndGamePanel.Get().IsVisible();
         }
 
+        /// <summary>
+        /// 判断鼠标是否悬停在UI上
+        /// </summary>
         public static bool IsOverUI()
         {
-            //return UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
             PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
             eventDataCurrentPosition.position = new Vector2(Input.mousePosition.x, Input.mousePosition.y);
             List<RaycastResult> results = new List<RaycastResult>();
@@ -209,6 +218,9 @@ namespace TcgEngine.UI
             return results.Count > 0;
         }
 
+        /// <summary>
+        /// 判断鼠标是否悬停在指定Sorting Layer的UI上
+        /// </summary>
         public static bool IsOverUILayer(string sorting_layer)
         {
             return IsOverUILayer(SortingLayer.NameToID(sorting_layer));
@@ -216,7 +228,6 @@ namespace TcgEngine.UI
 
         public static bool IsOverUILayer(int sorting_layer)
         {
-            //return UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
             PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
             eventDataCurrentPosition.position = new Vector2(Input.mousePosition.x, Input.mousePosition.y);
             List<RaycastResult> results = new List<RaycastResult>();
@@ -230,6 +241,9 @@ namespace TcgEngine.UI
             return count > 0;
         }
 
+        /// <summary>
+        /// 判断鼠标是否悬停在指定RectTransform区域
+        /// </summary>
         public static bool IsOverRectTransform(Canvas canvas, RectTransform rect)
         {
             PointerEventData pevent = new PointerEventData(EventSystem.current);
@@ -247,6 +261,9 @@ namespace TcgEngine.UI
             return false;
         }
 
+        /// <summary>
+        /// 将鼠标屏幕坐标转换为RectTransform本地坐标
+        /// </summary>
         public static Vector2 MouseToRectPos(Canvas canvas, RectTransform rect, Vector2 screen_pos)
         {
             if (canvas.renderMode != RenderMode.ScreenSpaceOverlay && canvas.worldCamera != null)
@@ -263,6 +280,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 将鼠标屏幕坐标转换为世界坐标
+        /// </summary>
         public static Vector3 MouseToWorld(Vector2 mouse_pos, float distance = 10f)
         {
             Camera cam = GameCamera.Get() != null ? GameCamera.GetCamera() : Camera.main;
@@ -270,11 +290,17 @@ namespace TcgEngine.UI
             return wpos;
         }
 
+        /// <summary>
+        /// 格式化数字，添加千位分隔符
+        /// </summary>
         public static string FormatNumber(int value)
         {
             return string.Format("{0:#,0}", value);
         }
 
+        /// <summary>
+        /// 获取单例
+        /// </summary>
         public static GameUI Get()
         {
             return instance;

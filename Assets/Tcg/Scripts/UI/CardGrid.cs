@@ -7,20 +7,21 @@ using TcgEngine;
 namespace TcgEngine.UI
 {
     /// <summary>
-    /// Grid of cards in the collection panel
+    /// 集合面板中的卡牌网格
     /// </summary>
 
     public class CardGrid : MonoBehaviour
     {
-        private GridLayoutGroup grid;
-        private RectTransform rect;
+        private GridLayoutGroup grid; // 网格布局组件
+        private RectTransform rect;   // 网格的 RectTransform
 
         void Awake()
         {
-            grid = GetComponent<GridLayoutGroup>();
-            rect = GetComponent<RectTransform>();
+            grid = GetComponent<GridLayoutGroup>(); // 获取 GridLayoutGroup 组件
+            rect = GetComponent<RectTransform>();   // 获取 RectTransform 组件
         }
 
+        // 计算网格的行数和列数
         public void GetColumnAndRow(out int rows, out int columns)
         {
             rows = 0;
@@ -29,7 +30,7 @@ namespace TcgEngine.UI
             if (grid.transform.childCount == 0)
                 return;
 
-            //Get the first child GameObject of the GridLayoutGroup
+            // 获取第一个子对象的 RectTransform
             RectTransform firstChildObj = grid.transform.GetChild(0).GetComponent<RectTransform>();
             Vector2 firstChildPos = firstChildObj.anchoredPosition;
             bool stopCountingCol = false;
@@ -37,36 +38,38 @@ namespace TcgEngine.UI
             if (firstChildPos.x == 0 && firstChildPos.y == 0)
                 return;
 
-            //Column and row are now 1
+            // 初始化行列为 1
             rows = 1;
             columns = 1;
 
-            //Loop through the rest of the child object
+            // 遍历剩余的子对象
             for (int i = 1; i < grid.transform.childCount; i++)
             {
-                //Get the next child
+                // 获取当前子对象
                 RectTransform currentChildObj = grid.transform.GetChild(i).GetComponent<RectTransform>();
                 Vector2 currentChildPos = currentChildObj.anchoredPosition;
 
-                //check if column or row
+                // 判断是列还是行
                 if (Mathf.Abs(firstChildPos.x - currentChildPos.x) < 0.1f)
                 {
-                    rows++;
+                    rows++;               // 行数增加
                     stopCountingCol = true;
                 }
                 else
                 {
                     if (!stopCountingCol)
-                        columns++;
+                        columns++;       // 列数增加
                 }
             }
         }
 
+        // 获取网格布局组件
         public GridLayoutGroup GetGrid()
         {
             return grid;
         }
 
+        // 获取网格的 RectTransform
         public RectTransform GetRect()
         {
             return rect;

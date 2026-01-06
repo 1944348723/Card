@@ -5,10 +5,6 @@ using UnityEngine.UI;
 
 namespace TcgEngine.UI
 {
-    /// <summary>
-    /// Add sound when clicking on a button
-    /// </summary>
-
     public class ButtonAudio : MonoBehaviour
     {
         public AudioClip click_audio;
