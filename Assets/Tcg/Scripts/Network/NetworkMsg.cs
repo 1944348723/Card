@@ -247,8 +247,6 @@ namespace TcgEngine
         }
     }
     
-    namespace TcgEngine
-{
     // 玩家攻击消息
     public class MsgAttackPlayer : INetworkSerializable
     {
@@ -386,7 +384,5 @@ namespace TcgEngine
             }
         }
     }
-}
-
-
+    
 }
