@@ -4,47 +4,56 @@ using UnityEngine;
 
 namespace TcgEngine
 {
-
     /// <summary>
-    /// Main audio script, allow to play sounds by channel
+    /// 主音频管理脚本，可按频道播放音效和音乐
+    /// 支持音量控制、淡入淡出、优先级播放等功能
     /// </summary>
-
     public class AudioTool : MonoBehaviour
     {
         private static AudioTool instance;
 
+        //音效频道字典，key为频道名称，value为AudioSource
         private Dictionary<string, AudioSource> channels_sfx = new Dictionary<string, AudioSource>();
+        //音乐频道字典，key为频道名称，value为AudioSource
         private Dictionary<string, AudioSource> channels_music = new Dictionary<string, AudioSource>();
+        //当前频道音量
         private Dictionary<string, float> channels_volume = new Dictionary<string, float>();
+        //目标音量，用于淡入淡出
         private Dictionary<string, float> tchannels_volume = new Dictionary<string, float>();
 
-        [HideInInspector] public float master_vol = 1f;
-        [HideInInspector] public float sfx_vol = 1f;
-        [HideInInspector] public float music_vol = 1f;
+        [HideInInspector] public float master_vol = 1f; //总音量
+        [HideInInspector] public float sfx_vol = 1f;    //音效音量
+        [HideInInspector] public float music_vol = 1f;  //音乐音量
 
         private void Awake()
         {
+            //加载存档音量设置
             LoadPrefs();
+            //刷新音量应用到所有频道
             RefreshVolume();
         }
 
         private void Update()
         {
+            //处理音乐频道淡入淡出
             foreach (KeyValuePair<string, AudioSource> pair in channels_music)
             {
                 if (pair.Value.isPlaying)
                 {
                     float tvol = tchannels_volume[pair.Key];
                     float vol = channels_volume[pair.Key];
+                    //音量平滑过渡
                     vol = Mathf.MoveTowards(vol, tvol, 0.5f * Time.deltaTime);
                     channels_volume[pair.Key] = vol;
                     pair.Value.volume = vol * music_vol;
 
+                    //音量过低时停止播放
                     if (vol < 0.01f && tvol < 0.01f)
                         StopMusic(pair.Key);
                 }
             }
 
+            //处理音效频道淡入淡出
             foreach (KeyValuePair<string, AudioSource> pair in channels_sfx)
             {
                 if (pair.Value.isPlaying)
@@ -61,8 +70,12 @@ namespace TcgEngine
             }
         }
 
-        //channel: Two sounds on the same channel will never play at the same time, sounds on different channel will play at the same time.
-        //priority: if false, will not play if a sound is already playing on the channel, if true, will replace current sound playing on channel
+        /// <summary>
+        /// 播放音效
+        /// channel: 频道名称，相同频道的音效不会同时播放
+        /// priority: true表示打断当前音效，false表示不打断
+        /// loop: 是否循环播放
+        /// </summary>
         public void PlaySFX(string channel, AudioClip sound, float vol = 0.6f, bool priority = true, bool loop = false)
         {
             if (string.IsNullOrEmpty(channel) || sound == null)
@@ -90,8 +103,11 @@ namespace TcgEngine
             }
         }
 
-        //channel: Two sounds on the same channel will never play at the same time, sounds on different channel will play at the same time.
-        //If music is already playing on the same channel, new music will be played unless its the same one.(Won't restart in that case)
+        /// <summary>
+        /// 播放音乐
+        /// channel: 频道名称
+        /// 相同频道的音乐如果不同会替换播放，否则不会重新播放
+        /// </summary>
         public void PlayMusic(string channel, AudioClip music, float vol = 0.3f, bool loop = true)
         {
             if (string.IsNullOrEmpty(channel) || music == null)
@@ -119,7 +135,9 @@ namespace TcgEngine
             }
         }
 
-        //Same as PlaySFX but takes random audio in array
+        /// <summary>
+        /// 播放随机音效（从数组中随机选取一个）
+        /// </summary>
         public void PlaySFX(string channel, AudioClip[] sounds, float vol = 0.6f, bool priority = true, bool loop = false)
         {
             if (sounds != null && sounds.Length > 0)
@@ -129,7 +147,9 @@ namespace TcgEngine
             }
         }
 
-        //Same as PlayMusic but takes random audio in array
+        /// <summary>
+        /// 播放随机音乐（从数组中随机选取一个）
+        /// </summary>
         public void PlayMusic(string channel, AudioClip[] musics, float vol = 0.6f, bool loop = false)
         {
             if (musics != null && musics.Length > 0)
@@ -139,6 +159,9 @@ namespace TcgEngine
             }
         }
 
+        /// <summary>
+        /// 停止指定频道音效
+        /// </summary>
         public void StopSFX(string channel)
         {
             if (string.IsNullOrEmpty(channel))
@@ -151,6 +174,9 @@ namespace TcgEngine
             }
         }
 
+        /// <summary>
+        /// 停止指定频道音乐
+        /// </summary>
         public void StopMusic(string channel)
         {
             if (string.IsNullOrEmpty(channel))
@@ -163,18 +189,25 @@ namespace TcgEngine
             }
         }
 
+        /// <summary>
+        /// 淡出指定频道音乐
+        /// </summary>
         public void FadeOutMusic(string channel)
         {
             if (tchannels_volume.ContainsKey(channel))
                 tchannels_volume[channel] = 0f;
         }
 
+        /// <summary>
+        /// 淡出指定频道音效
+        /// </summary>
         public void FadeOutSFX(string channel)
         {
             if (tchannels_volume.ContainsKey(channel))
                 tchannels_volume[channel] = 0f;
         }
 
+        //设置主音量并保存
         public void SetMasterVolume(float value)
         {
             master_vol = value;
@@ -182,6 +215,7 @@ namespace TcgEngine
             SavePrefs();
         }
 
+        //设置音乐音量并保存
         public void SetMusicVolume(float value)
         {
             music_vol = value;
@@ -189,6 +223,7 @@ namespace TcgEngine
             SavePrefs();
         }
 
+        //设置音效音量并保存
         public void SetSFXVolume(float value)
         {
             sfx_vol = value;
@@ -196,6 +231,7 @@ namespace TcgEngine
             SavePrefs();
         }
 
+        //加载存档音量
         public void LoadPrefs()
         {
             master_vol = PlayerPrefs.GetFloat("audio_master_volume", 1f);
@@ -203,6 +239,7 @@ namespace TcgEngine
             sfx_vol = PlayerPrefs.GetFloat("audio_sfx_volume", 1f);
         }
 
+        //保存音量设置
         public void SavePrefs()
         {
             PlayerPrefs.SetFloat("audio_master_volume", master_vol);
@@ -210,9 +247,11 @@ namespace TcgEngine
             PlayerPrefs.SetFloat("audio_sfx_volume", sfx_vol);
         }
 
+        /// <summary>
+        /// 刷新所有频道音量
+        /// </summary>
         public void RefreshVolume()
         {
-
             AudioListener.volume = master_vol;
 
             foreach (KeyValuePair<string, AudioSource> pair in channels_sfx)
@@ -234,6 +273,9 @@ namespace TcgEngine
             }
         }
 
+        /// <summary>
+        /// 判断指定音乐频道是否在播放
+        /// </summary>
         public bool IsMusicPlaying(string channel)
         {
             AudioSource source = GetMusicChannel(channel);
@@ -242,6 +284,9 @@ namespace TcgEngine
             return false;
         }
 
+        /// <summary>
+        /// 创建一个新的音频频道
+        /// </summary>
         public AudioSource CreateChannel(string channel, int priority = 128)
         {
             if (string.IsNullOrEmpty(channel))
@@ -256,6 +301,9 @@ namespace TcgEngine
             return caudio;
         }
 
+        /// <summary>
+        /// 获取音效频道
+        /// </summary>
         public AudioSource GetChannel(string channel)
         {
             if (channels_sfx.ContainsKey(channel))
@@ -263,6 +311,9 @@ namespace TcgEngine
             return null;
         }
 
+        /// <summary>
+        /// 获取音乐频道
+        /// </summary>
         public AudioSource GetMusicChannel(string channel)
         {
             if (channels_music.ContainsKey(channel))
@@ -295,6 +346,9 @@ namespace TcgEngine
             return music_vol;
         }
 
+        /// <summary>
+        /// 获取单例
+        /// </summary>
         public static AudioTool Get()
         {
             if (instance == null)
@@ -307,4 +361,3 @@ namespace TcgEngine
         }
     }
 }
-

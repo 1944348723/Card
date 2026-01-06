@@ -7,48 +7,54 @@ using UnityEngine.UI;
 namespace TcgEngine
 {
     /// <summary>
-    /// Use this tool to upload your cards, packs and rewards to the Mongo Database (it will overwrite existing data)
+    /// 卡牌上传工具脚本
+    /// 用于将卡牌、卡包、奖励等数据上传到 Mongo 数据库（会覆盖已有数据）
     /// </summary>
-
     public class CardUploader : MonoBehaviour
     {
-        public string username = "admin";
+        public string username = "admin"; // 默认管理员用户名
 
-        [Header("References")]
-        public InputField username_txt;
-        public InputField password_txt;
-        public Text msg_text;
+        [Header("引用组件")]
+        public InputField username_txt;   // 用户名输入框
+        public InputField password_txt;   // 密码输入框
+        public Text msg_text;             // 提示信息文本
 
-        [Header("Upload")]
-        public bool upload_cards = true;
-        public bool upload_packs = true;
-        public bool upload_decks = true;
-        public bool upload_variants = true;
-        public bool upload_rewards = true;
+        [Header("上传选项")]
+        public bool upload_cards = true;     // 是否上传卡牌
+        public bool upload_packs = true;     // 是否上传卡包
+        public bool upload_decks = true;     // 是否上传起始套牌
+        public bool upload_variants = true;  // 是否上传卡牌变体
+        public bool upload_rewards = true;   // 是否上传奖励
 
         void Start()
         {
-            username_txt.text = username;
+            username_txt.text = username; // 初始化用户名输入框
             msg_text.text = "";
         }
 
+        /// <summary>
+        /// 管理员登录
+        /// </summary>
         private async void Login()
         {
             LoginResponse res = await ApiClient.Get().Login(username_txt.text, password_txt.text);
             if (res.success && res.permission_level >= 10)
             {
-                UploadAll();
+                UploadAll(); // 登录成功，开始上传
             }
             else
             {
-                ShowText("Admin Login Failed");
+                ShowText("管理员登录失败");
             }
         }
 
+        /// <summary>
+        /// 上传所有选择的内容
+        /// </summary>
         private async void UploadAll()
         {
-            //Delete previous data
-            ShowText("Deleting previous data...");
+            // 删除已有数据
+            ShowText("正在删除已有数据...");
 
             if(upload_packs)
                 await DeleteAllPacks();
@@ -61,7 +67,7 @@ namespace TcgEngine
             if (upload_rewards)
                 await DeleteAllRewards();
 
-            //Packs
+            // 上传卡包
             if (upload_packs)
             {
                 List<PackData> packs = PackData.GetAll();
@@ -70,61 +76,61 @@ namespace TcgEngine
                     PackData pack = packs[i];
                     if (pack.available)
                     {
-                        ShowText("Uploading Packs: " + pack.id);
+                        ShowText("上传卡包: " + pack.id);
                         UploadPack(pack);
                         await TimeTool.Delay(100);
                     }
                 }
             }
 
-            //Cards
+            // 上传卡牌（按批次处理）
             if (upload_cards)
             {
                 List<CardData> cards = CardData.GetAll();
                 for (int i = 0; i < cards.Count; i += 100)
                 {
                     List<CardData> list = GetCardGroup(cards, i, 100);
-                    ShowText("Uploading Cards: " + i + "-" + (i + 100 - 1));
+                    ShowText("上传卡牌: " + i + "-" + (i + 100 - 1));
                     UploadCardList(list);
                     await TimeTool.Delay(200);
                 }
             }
 
-            //Variants
+            // 上传卡牌变体
             if (upload_variants)
             {
                 List<VariantData> variants = VariantData.GetAll();
                 for (int i = 0; i < variants.Count; i++)
                 {
                     VariantData variant = variants[i];
-                    ShowText("Uploading Variant: " + variant.id);
+                    ShowText("上传卡牌变体: " + variant.id);
                     UploadVariant(variant);
                     await TimeTool.Delay(100);
                 }
             }
 
-            //Starter Decks
+            // 上传起始套牌及奖励
             if (upload_decks)
             {
                 DeckData[] decks = GameplayData.Get().starter_decks;
                 for (int i = 0; i < decks.Length; i++)
                 {
                     DeckData deck = decks[i];
-                    ShowText("Uploading Deck: " + deck.id);
+                    ShowText("上传套牌: " + deck.id);
                     UploadDeck(deck);
                     UploadDeckReward(deck);
                     await TimeTool.Delay(100);
                 }
             }
 
-            //Solo rewards
+            // 上传单人关卡奖励
             if (upload_rewards)
             {
                 List<LevelData> levels = LevelData.GetAll();
                 for (int i = 0; i < levels.Count; i++)
                 {
                     LevelData level = levels[i];
-                    ShowText("Uploading Reward: " + level.id);
+                    ShowText("上传关卡奖励: " + level.id);
                     UploadLevelReward(level);
 
                     if (level.reward_decks != null)
@@ -137,14 +143,14 @@ namespace TcgEngine
                 }
             }
 
-            //Custom rewards
+            // 上传自定义奖励
             if (upload_rewards)
             {
                 List<RewardData> rewards = RewardData.GetAll();
                 for (int i = 0; i < rewards.Count; i++)
                 {
                     RewardData reward = rewards[i];
-                    ShowText("Uploading Reward: " + reward.id);
+                    ShowText("上传自定义奖励: " + reward.id);
                     UploadReward(reward);
 
                     foreach (DeckData deck in reward.decks)
@@ -154,10 +160,11 @@ namespace TcgEngine
                 }
             }
 
-            ShowText("Completed!");
+            ShowText("上传完成！");
             ApiClient.Get().Logout();
         }
 
+        #region 删除接口
         private async Task DeleteAllPacks()
         {
             string url = ApiClient.ServerURL + "/packs";
@@ -187,7 +194,9 @@ namespace TcgEngine
             string url = ApiClient.ServerURL + "/rewards";
             await ApiClient.Get().SendRequest(url, WebRequest.METHOD_DELETE);
         }
+        #endregion
 
+        #region 上传接口
         private async void UploadPack(PackData pack)
         {
             PackAddRequest req = new PackAddRequest();
@@ -395,7 +404,11 @@ namespace TcgEngine
             string json = ApiTool.ToJson(req);
             await ApiClient.Get().SendPostRequest(url, json);
         }
+        #endregion
 
+        /// <summary>
+        /// 获取指定范围内的卡牌列表
+        /// </summary>
         private List<CardData> GetCardGroup(List<CardData> all_cards, int start, int count)
         {
             List<CardData> list = new List<CardData>();
@@ -414,12 +427,18 @@ namespace TcgEngine
             return list;
         }
 
+        /// <summary>
+        /// 显示信息
+        /// </summary>
         private void ShowText(string txt)
         {
             msg_text.text = txt;
             Debug.Log(txt);
         }
 
+        /// <summary>
+        /// 点击按钮开始上传
+        /// </summary>
         public void OnClickStart()
         {
             msg_text.text = "";
@@ -427,63 +446,65 @@ namespace TcgEngine
         }
     }
 
+    #region 上传请求数据类
     [System.Serializable]
     public class CardAddListRequest
     {
-        public CardAddRequest[] cards;
+        public CardAddRequest[] cards; // 批量卡牌请求
     }
 
     [System.Serializable]
     public class CardAddRequest
     {
-        public string tid;
-        public string type;
-        public string team;
-        public string rarity;
-        public int mana;
-        public int attack;
-        public int hp;
-        public int cost;
-        public string[] packs;
+        public string tid;      // 卡牌 ID
+        public string type;     // 类型
+        public string team;     // 队伍
+        public string rarity;   // 稀有度
+        public int mana;        // 法力值
+        public int attack;      // 攻击力
+        public int hp;          // 生命值
+        public int cost;        // 消耗
+        public string[] packs;  // 所属卡包
     }
 
     [System.Serializable]
     public class PackAddRequest
     {
-        public string tid;
-        public int cards;
-        public int cost;
-        public bool random;
-        public PackAddProbability[] rarities_1st;
-        public PackAddProbability[] rarities;
-        public PackAddProbability[] variants;
+        public string tid;                     // 卡包 ID
+        public int cards;                       // 卡牌数量
+        public int cost;                        // 花费
+        public bool random;                     // 是否随机
+        public PackAddProbability[] rarities_1st; // 初始稀有度概率
+        public PackAddProbability[] rarities;    // 稀有度概率
+        public PackAddProbability[] variants;    // 变体概率
     }
 
     [System.Serializable]
     public class PackAddProbability
     {
-        public string tid;
-        public int value;
+        public string tid;   // 卡牌或变体 ID
+        public int value;    // 概率值
     }
 
     [System.Serializable]
     public class VariantAddRequest
     {
-        public string tid;
-        public int cost_factor;
-        public bool is_default;
+        public string tid;         // 变体 ID
+        public int cost_factor;    // 成本系数
+        public bool is_default;    // 是否默认
     }
 
     [System.Serializable]
     public class RewardAddRequest
     {
-        public string tid;
-        public string group;
-        public int coins;
-        public int xp;
-        public string[] packs;
-        public string[] cards;
-        public string[] decks;
-        public bool repeat;
+        public string tid;         // 奖励 ID
+        public string group;       // 奖励组
+        public int coins;          // 金币数量
+        public int xp;             // 经验值
+        public string[] packs;     // 奖励卡包
+        public string[] cards;     // 奖励卡牌
+        public string[] decks;     // 奖励套牌
+        public bool repeat;        // 是否可重复
     }
+    #endregion
 }

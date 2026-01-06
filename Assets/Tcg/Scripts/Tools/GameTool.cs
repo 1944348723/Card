@@ -7,15 +7,20 @@ using UnityEngine.Rendering.Universal;
 namespace TcgEngine
 {
     /// <summary>
-    /// Generic static functions for TcgEngine
+    /// 游戏工具类（静态方法集合）
+    /// 提供随机数、UID生成、列表操作以及设备/渲染管线检测等通用方法
     /// </summary>
-
     public static class GameTool
     {
         private const string uid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         private static System.Random random = new System.Random();
 
-        //Generate a random string to use as UID
+        /// <summary>
+        /// 生成一个随机字符串，可用作唯一 ID（UID）
+        /// </summary>
+        /// <param name="min">最小长度</param>
+        /// <param name="max">最大长度</param>
+        /// <returns>随机生成的字符串</returns>
         public static string GenerateRandomID(int min = 9, int max = 15)
         {
             int length = random.Next(min, max);
@@ -27,27 +32,33 @@ namespace TcgEngine
             return unique_id;
         }
 
-        //Generate a random int
+        /// <summary>
+        /// 生成一个随机整数
+        /// </summary>
         public static int GenerateRandomInt()
         {
             return random.Next(int.MinValue, int.MaxValue);
         }
 
-        //Generate a random ulong
+        /// <summary>
+        /// 生成一个随机 ulong（64 位无符号整数）
+        /// </summary>
         public static ulong GenerateRandomUInt64()
         {
-            ulong id = (uint)random.Next(int.MinValue, int.MaxValue); //Cast to uint before casting to ulong
-            uint bid = (uint)random.Next(int.MinValue, int.MaxValue);
+            ulong id = (uint)random.Next(int.MinValue, int.MaxValue); // 先生成低 32 位
+            uint bid = (uint)random.Next(int.MinValue, int.MaxValue); // 再生成高 32 位
             id = id << 32;
             id = id | bid;
             return id;
         }
 
-        //Pick X random elements in a list (same cant be picked twice, unless it appears twice or more in the list)
+        /// <summary>
+        /// 从 source 列表中随机选择 x 个元素放入 dest（不会重复选择，除非 source 中本身有重复元素）
+        /// </summary>
         public static List<T> PickXRandom<T>(List<T> source, List<T> dest, int x)
         {
             if (source.Count <= x || x <= 0)
-                return source; //No need to pick anything
+                return source; // 不需要选择，直接返回原列表
 
             if (dest.Count > 0)
                 dest.Clear();
@@ -62,7 +73,9 @@ namespace TcgEngine
             return dest;
         }
 
-        //Clone a list of string in most optimized way (avoiding as many Add/Remove as possible)
+        /// <summary>
+        /// 克隆字符串列表（高效方式，尽量避免不必要的 Add/Remove）
+        /// </summary>
         public static void CloneList(List<string> source, List<string> dest)
         {
             for (int i = 0; i < source.Count; i++)
@@ -77,7 +90,9 @@ namespace TcgEngine
                 dest.RemoveRange(source.Count, dest.Count - source.Count);
         }
 
-        //Clone a list in most optimized way, only the list is cloned, elements references are preserved
+        /// <summary>
+        /// 克隆列表（元素引用保留，不复制元素本身）
+        /// </summary>
         public static void CloneListRef<T>(List<T> source, List<T> dest) where T : class
         {
             for (int i = 0; i < source.Count; i++)
@@ -92,25 +107,29 @@ namespace TcgEngine
                 dest.RemoveRange(source.Count, dest.Count - source.Count);
         }
 
-        //Same a previous function, but elements could be null
+        /// <summary>
+        /// 克隆列表（元素可为空）
+        /// </summary>
         public static void CloneListRefNull<T>(List<T> source, ref List<T> dest) where T : class
         {
-            //Source is null, set destination null
+            // source 为 null，则 dest 也置为 null
             if (source == null)
             {
                 dest = null;
                 return;
             }
 
-            //Dest is null
+            // dest 为 null，创建新列表
             if (dest == null)
                 dest = new List<T>();
 
-            //Both arent null, clone
+            // 两者都不为 null，进行克隆
             CloneListRef(source, dest);
         }
 
-        //Check if current device is mobile device
+        /// <summary>
+        /// 检查当前设备是否为移动设备（Android/iOS/Tizen）
+        /// </summary>
         public static bool IsMobile()
         {
 #if UNITY_ANDROID || UNITY_IOS || UNITY_TIZEN
@@ -120,8 +139,10 @@ namespace TcgEngine
 #endif
         }
 
-        //Check if using Universal Render Pipeline
-        //If this function return compile error (because URP isnt installed and you dont want it, you can simply comment the code and return false
+        /// <summary>
+        /// 检查当前项目是否使用 Universal Render Pipeline (URP)
+        /// 如果返回编译错误（因为项目未安装 URP），可以注释掉此函数并返回 false
+        /// </summary>
         public static bool IsURP()
         {
             if (GraphicsSettings.renderPipelineAsset is UniversalRenderPipelineAsset)
