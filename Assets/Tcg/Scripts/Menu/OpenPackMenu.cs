@@ -6,24 +6,24 @@ using UnityEngine;
 namespace TcgEngine.Client
 {
     /// <summary>
-    /// Main script for the open pack scene
+    /// 开包界面主脚本（Open Pack Menu）
+    /// 负责处理卡包的开启、显示卡片、随机抽取以及保存玩家卡牌数据
     /// </summary>
-
     public class OpenPackMenu : MonoBehaviour
     {
-        public GameObject card_prefab;
+        public GameObject card_prefab; // 卡牌预制体，用于实例化卡牌
 
-        private bool revealing = false;
-
-        private static OpenPackMenu instance;
+        private bool revealing = false; // 是否正在显示开包动画
+        private static OpenPackMenu instance; // 单例
 
         void Awake()
         {
-            instance = this;
+            instance = this; // 保存单例
         }
 
         void Update()
         {
+            // 如果正在开包动画中，点击鼠标左键检查是否所有卡牌已显示
             if (revealing && Input.GetMouseButtonDown(0))
             {
                 bool all_revealed = true;
@@ -33,11 +33,16 @@ namespace TcgEngine.Client
                         all_revealed = false;
                 }
 
+                // 所有卡牌显示完毕，则停止显示
                 if (all_revealed && PackCard.GetAll().Count > 0)
                     StopReveal();
             }
         }
 
+        /// <summary>
+        /// 开启卡包（通过卡包ID）
+        /// </summary>
+        /// <param name="pack_tid">卡包ID</param>
         public void OpenPack(string pack_tid)
         {
             PackData pack = PackData.Get(pack_tid);
@@ -47,18 +52,27 @@ namespace TcgEngine.Client
             }
         }
 
+        /// <summary>
+        /// 开启卡包（通过卡包数据）
+        /// 根据运行模式调用 API 或 测试模式方法
+        /// </summary>
+        /// <param name="pack">卡包数据</param>
         public void OpenPack(PackData pack)
         {
             if (Authenticator.Get().IsApi())
             {
-                OpenPackApi(pack);
+                OpenPackApi(pack); // API模式
             }
             if (Authenticator.Get().IsTest())
             {
-                OpenPackTest(pack);
+                OpenPackTest(pack); // 测试模式
             }
         }
-        
+
+        /// <summary>
+        /// 测试模式开包
+        /// 随机抽取卡牌或固定卡牌，并更新玩家数据
+        /// </summary>
         public async void OpenPackTest(PackData pack)
         {
             UserData udata = Authenticator.Get().UserData;
@@ -66,14 +80,15 @@ namespace TcgEngine.Client
                 return;
 
             List<UserCardData> cards = new List<UserCardData>();
-            List <CardData> all_cards = CardData.GetAll(pack);
+            List<CardData> all_cards = CardData.GetAll(pack);
 
+            // 随机包处理
             if (pack.type == PackType.Random)
             {
                 for (int i = 0; i < pack.cards; i++)
                 {
-                    RarityData rarity = GetRandomRarity(pack, i == 0);
-                    VariantData variant = GetRandomVariant(pack);
+                    RarityData rarity = GetRandomRarity(pack, i == 0); // 第一张卡可能有特殊稀有度规则
+                    VariantData variant = GetRandomVariant(pack); // 随机卡面
                     List<CardData> vcards = GetCardArray(all_cards, rarity);
                     if (vcards.Count > 0)
                     {
@@ -84,6 +99,7 @@ namespace TcgEngine.Client
                 }
             }
 
+            // 固定包处理
             if (pack.type == PackType.Fixed)
             {
                 for (int i = 0; i < Mathf.Min(pack.cards, all_cards.Count); i++)
@@ -95,20 +111,24 @@ namespace TcgEngine.Client
                 }
             }
 
-            //Reveal cards
+            // 展示卡牌动画
             RevealCards(pack, cards.ToArray());
 
-            //Save cards
+            // 更新玩家数据
             udata.AddPack(pack.id, -1);
             foreach (UserCardData card in cards)
             {
                 udata.AddCard(card.tid, card.variant, card.quantity);
             }
 
-            await Authenticator.Get().SaveUserData();
-            HandPackArea.Get().LoadPacks();
+            await Authenticator.Get().SaveUserData(); // 保存玩家数据
+            HandPackArea.Get().LoadPacks(); // 刷新卡包界面
         }
 
+        /// <summary>
+        /// API模式开包
+        /// 向服务器请求开包结果并显示卡牌
+        /// </summary>
         public async void OpenPackApi(PackData pack)
         {
             UserData udata = Authenticator.Get().UserData;
@@ -127,17 +147,21 @@ namespace TcgEngine.Client
             if (res.success)
             {
                 UserCardData[] cards = ApiTool.JsonToArray<UserCardData>(res.data);
-                RevealCards(pack, cards);
+                RevealCards(pack, cards); // 显示卡牌
             }
 
             HandPackArea.Get().LoadPacks();
         }
 
+        /// <summary>
+        /// 展示卡牌动画
+        /// 实例化卡牌预制体，并设置目标位置
+        /// </summary>
         public void RevealCards(PackData pack, UserCardData[] cards)
         {
             UserData udata = Authenticator.Get().UserData;
             CardbackData cb = CardbackData.Get(udata.cardback);
-            HandPackArea.Get().Lock(true);
+            HandPackArea.Get().Lock(true); // 锁定操作
             revealing = true;
 
             int index = 0;
@@ -158,7 +182,10 @@ namespace TcgEngine.Client
             }
         }
 
-        private List<CardData> GetCardArray(List<CardData>  all_cards, RarityData rarity)
+        /// <summary>
+        /// 获取指定稀有度的卡牌列表
+        /// </summary>
+        private List<CardData> GetCardArray(List<CardData> all_cards, RarityData rarity)
         {
             List<CardData> cards = new List<CardData>();
             foreach (CardData acard in all_cards)
@@ -169,6 +196,10 @@ namespace TcgEngine.Client
             return cards;
         }
 
+        /// <summary>
+        /// 随机获取卡包稀有度
+        /// 第一张卡可能使用不同概率表
+        /// </summary>
         private RarityData GetRandomRarity(PackData pack, bool is_first)
         {
             PackRarity[] rarities = is_first ? pack.rarities_1st : pack.rarities;
@@ -194,6 +225,9 @@ namespace TcgEngine.Client
             return RarityData.GetFirst();
         }
 
+        /// <summary>
+        /// 随机获取卡牌版本
+        /// </summary>
         private VariantData GetRandomVariant(PackData pack)
         {
             PackVariant[] variants = pack.variants;
@@ -219,19 +253,22 @@ namespace TcgEngine.Client
             return VariantData.GetDefault();
         }
 
+        /// <summary>
+        /// 停止显示开包动画
+        /// </summary>
         public void StopReveal()
         {
             revealing = false;
-            HandPackArea.Get().Lock(false);
+            HandPackArea.Get().Lock(false); // 解锁操作
             foreach (PackCard card in PackCard.GetAll())
             {
-                card.Remove();
+                card.Remove(); // 移除显示的卡牌
             }
         }
 
         public void OnClickBack()
         {
-            SceneNav.GoTo("Menu");
+            SceneNav.GoTo("Menu"); // 返回主菜单
         }
 
         public static OpenPackMenu Get()

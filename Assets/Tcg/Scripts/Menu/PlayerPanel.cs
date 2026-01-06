@@ -7,61 +7,64 @@ using TcgEngine.Client;
 namespace TcgEngine.UI
 {
     /// <summary>
-    /// Player panel appears when you click on your avatar in the menu
-    /// it shows all stats related to your account, and let you change avatar/cardback
+    /// 玩家面板（PlayerPanel）
+    /// 当点击菜单中的头像时显示，展示玩家账户相关的所有信息
+    /// 并允许玩家更换头像或卡背
     /// </summary>
 
     public class PlayerPanel : UIPanel
     {
         [Header("Player")]
-        public Text player_name;
-        public Text player_level;
-        public AvatarUI avatar;
-        public CardbackUI cardback;
-        public Text elo;
-        public Text winrate;
-        public Text cards_all;
-        public Text victories;
-        public Text defeats;
+        public Text player_name;      // 玩家昵称
+        public Text player_level;     // 玩家等级
+        public AvatarUI avatar;       // 玩家头像UI
+        public CardbackUI cardback;   // 玩家卡背UI
+        public Text elo;              // Elo值
+        public Text winrate;          // 胜率
+        public Text cards_all;        // 拥有卡牌总数
+        public Text victories;        // 胜场
+        public Text defeats;          // 败场
 
         [Header("Bottom bar")]
-        public GameObject buttons_area;
-        public GameObject account_button;
-        public GameObject sell_button;
+        public GameObject buttons_area;      // 底部按钮区域
+        public GameObject account_button;    // 账号按钮
+        public GameObject sell_button;       // 出售按钮
 
         [Header("Avatars")]
-        public UIPanel avatar_panel;
-        public AvatarUI[] avatars;
+        public UIPanel avatar_panel;  // 头像选择面板
+        public AvatarUI[] avatars;    // 所有头像UI
 
         [Header("Cardbacks")]
-        public UIPanel cardback_panel;
-        public CardbackUI[] cardbacks;
+        public UIPanel cardback_panel; // 卡背选择面板
+        public CardbackUI[] cardbacks; // 所有卡背UI
 
         [Header("Edit Panel")]
-        public UIPanel edit_panel;
-        public InputField user_email;
-        public InputField user_password_prev;
-        public InputField user_password_new;
-        public InputField user_password_confirm;
-        public Button edit_change_email;
-        public Button edit_change_password;
-        public Button resend_button;
-        public Button confirm_button;
-        public Text edit_error;
+        public UIPanel edit_panel;          // 编辑信息面板
+        public InputField user_email;       // 用户邮箱输入框
+        public InputField user_password_prev;   // 旧密码输入框
+        public InputField user_password_new;    // 新密码输入框
+        public InputField user_password_confirm; // 确认密码输入框
+        public Button edit_change_email;    // 修改邮箱按钮
+        public Button edit_change_password; // 修改密码按钮
+        public Button resend_button;        // 重发验证邮件按钮
+        public Button confirm_button;       // 确认修改按钮
+        public Text edit_error;             // 编辑错误提示
 
-        private string username;
-        private UserData user_data;
+        private string username;            // 当前显示的用户名
+        private UserData user_data;         // 当前显示的玩家数据
 
-        private static PlayerPanel instance;
+        private static PlayerPanel instance; // 单例
 
         protected override void Awake()
         {
             base.Awake();
             instance = this;
 
+            // 注册头像点击事件
             foreach (AvatarUI icon in avatars)
                 icon.onClick += OnClickAvatar;
 
+            // 注册卡背点击事件
             foreach (CardbackUI icon in cardbacks)
                 icon.onClick += OnClickCardback;
         }
@@ -69,7 +72,7 @@ namespace TcgEngine.UI
         protected override void Update()
         {
             base.Update();
-
+            // 可在此添加动态UI刷新逻辑
         }
 
         protected override void Start()
@@ -77,6 +80,10 @@ namespace TcgEngine.UI
             base.Start();
         }
 
+        /// <summary>
+        /// 加载玩家数据
+        /// 如果是自己则从本地获取，否则从服务器获取
+        /// </summary>
         private async void LoadData()
         {
             if (IsYou())
@@ -87,6 +94,9 @@ namespace TcgEngine.UI
             RefreshPanel();
         }
 
+        /// <summary>
+        /// 清空面板显示内容
+        /// </summary>
         private void ClearPanel()
         {
             player_name.text = "";
@@ -97,6 +107,9 @@ namespace TcgEngine.UI
             cardback.Hide();
         }
 
+        /// <summary>
+        /// 刷新面板显示
+        /// </summary>
         private void RefreshPanel()
         {
             avatar_panel.Hide();
@@ -121,12 +134,16 @@ namespace TcgEngine.UI
                 defeats.text = user.defeats.ToString();
                 cards_all.text = user.CountUniqueCards() + " / " + CardData.GetAllDeckbuilding().Count;
 
-                buttons_area?.SetActive(IsYou());    //Buttons like logout only active if your account
+                // 仅显示自己账户相关按钮
+                buttons_area?.SetActive(IsYou());
                 account_button?.SetActive(Authenticator.Get().IsApi());
                 sell_button?.SetActive(Authenticator.Get().IsApi());
             }
         }
 
+        /// <summary>
+        /// 刷新头像列表
+        /// </summary>
         private void RefreshAvatarList()
         {
             foreach (AvatarUI icon in avatars)
@@ -147,6 +164,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 刷新卡背列表
+        /// </summary>
         private void RefreshCardBackList()
         {
             foreach (CardbackUI line in cardbacks)
@@ -167,6 +187,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 点击头像时更换玩家头像
+        /// </summary>
         private void OnClickAvatar(AvatarData avatar)
         {
             user_data = Authenticator.Get().UserData;
@@ -179,6 +202,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 点击卡背时更换玩家卡背
+        /// </summary>
         private void OnClickCardback(CardbackData cb)
         {
             user_data = Authenticator.Get().UserData;
@@ -191,6 +217,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 保存头像到服务器及本地
+        /// </summary>
         private async void SaveUserAvatar(AvatarData avatar)
         {
             if (ApiClient.Get().IsConnected())
@@ -206,6 +235,9 @@ namespace TcgEngine.UI
             RefreshPanel();
         }
 
+        /// <summary>
+        /// 保存卡背到服务器及本地
+        /// </summary>
         private async void SaveUserCardback(CardbackData cardback)
         {
             if (ApiClient.Get().IsConnected())
@@ -221,6 +253,9 @@ namespace TcgEngine.UI
             RefreshPanel();
         }
 
+        /// <summary>
+        /// 点击头像按钮显示头像选择面板
+        /// </summary>
         public void OnClickAvatar()
         {
             if (!IsYou())
@@ -230,6 +265,9 @@ namespace TcgEngine.UI
             avatar_panel.Show();
         }
 
+        /// <summary>
+        /// 点击卡背按钮显示卡背选择面板
+        /// </summary>
         public void OnClickCardBack()
         {
             if (!IsYou())
@@ -239,16 +277,25 @@ namespace TcgEngine.UI
             cardback_panel.Show();
         }
 
+        /// <summary>
+        /// 点击好友按钮
+        /// </summary>
         public void OnClickFriends()
         {
             FriendPanel.Get().Show();
         }
 
+        /// <summary>
+        /// 点击出售重复卡牌按钮
+        /// </summary>
         public void OnClickDuplicates()
         {
             SellDuplicatePanel.Get().Show();
         }
 
+        /// <summary>
+        /// 点击编辑按钮，显示编辑面板
+        /// </summary>
         public void OnClickEdit()
         {
             user_email.readOnly = true;
@@ -271,6 +318,9 @@ namespace TcgEngine.UI
             edit_panel.Show();
         }
 
+        /// <summary>
+        /// 点击更改密码按钮
+        /// </summary>
         public void OnClickChangePass()
         {
             OnClickEdit();
@@ -289,6 +339,9 @@ namespace TcgEngine.UI
             user_password_prev.Select();
         }
 
+        /// <summary>
+        /// 点击更改邮箱按钮
+        /// </summary>
         public void OnClickChangeEmail()
         {
             OnClickEdit();
@@ -300,6 +353,9 @@ namespace TcgEngine.UI
             user_email.Select();
         }
 
+        /// <summary>
+        /// 点击重发验证邮件按钮
+        /// </summary>
         public async void OnClickResendConfirm()
         {
             edit_error.text = "";
@@ -315,6 +371,10 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 点击编辑面板的确认按钮
+        /// 修改邮箱或密码
+        /// </summary>
         public async void OnClickEditConfirm()
         {
             edit_error.text = "";
@@ -358,17 +418,26 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 判断当前面板显示的是否为自己
+        /// </summary>
         public bool IsYou()
         {
             return username == ApiClient.Get().Username;
         }
 
+        /// <summary>
+        /// 显示自己玩家信息
+        /// </summary>
         public void ShowPlayer()
         {
             string user = ApiClient.Get().Username;
             ShowPlayer(user);
         }
 
+        /// <summary>
+        /// 显示指定玩家信息
+        /// </summary>
         public void ShowPlayer(string user)
         {
             if (username != user)
@@ -389,6 +458,9 @@ namespace TcgEngine.UI
             edit_panel.Hide();
         }
 
+        /// <summary>
+        /// 获取单例
+        /// </summary>
         public static PlayerPanel Get()
         {
             return instance;

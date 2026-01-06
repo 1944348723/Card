@@ -1,40 +1,40 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using TcgEngine.Client;
 using UnityEngine;
 using UnityEngine.UI;
-using TcgEngine.Client;
 
 namespace TcgEngine.UI
 {
     /// <summary>
-    /// Main script for the main menu scene
+    /// 主菜单场景主脚本
+    /// 控制主菜单 UI 显示、玩家信息、牌组选择、多种游戏模式和匹配功能
     /// </summary>
-
     public class MainMenu : MonoBehaviour
     {
-        public AudioClip music;
-        public AudioClip ambience;
+        public AudioClip music;           // 背景音乐
+        public AudioClip ambience;        // 环境音效
 
         [Header("Player UI")]
-        public Text username_txt;
-        public Text credits_txt;
-        public AvatarUI avatar;
-        public GameObject loader;
+        public Text username_txt;         // 显示用户名
+        public Text credits_txt;          // 显示金币/积分
+        public AvatarUI avatar;           // 玩家头像 UI
+        public GameObject loader;         // 匹配加载提示
 
         [Header("UI")]
-        public Text version_text;
-        public DeckSelector deck_selector;
-        public DeckDisplay deck_preview;
+        public Text version_text;         // 游戏版本文本
+        public DeckSelector deck_selector; // 牌组选择器
+        public DeckDisplay deck_preview;  // 牌组预览
 
-        private bool starting = false;
+        private bool starting = false;    // 防止重复启动游戏
 
-        private static MainMenu instance;
+        private static MainMenu instance; // 单例
 
         void Awake()
         {
             instance = this;
 
-            //Set default settings
+            // 设置默认游戏设置
             Application.targetFrameRate = 120;
             GameClient.game_settings = GameSettings.Default;
         }
@@ -48,8 +48,10 @@ namespace TcgEngine.UI
             username_txt.text = "";
             credits_txt.text = "";
             version_text.text = "Version " + Application.version;
+
             deck_selector.onChange += OnChangeDeck;
 
+            // 检查是否已登录
             if (Authenticator.Get().IsConnected())
                 AfterLogin();
             else
@@ -61,9 +63,10 @@ namespace TcgEngine.UI
             UserData udata = Authenticator.Get().UserData;
             if (udata != null)
             {
-                credits_txt.text = GameUI.FormatNumber(udata.coins);
+                credits_txt.text = GameUI.FormatNumber(udata.coins); // 更新金币显示
             }
 
+            // 更新匹配状态显示
             bool matchmaking = GameClientMatchmaker.Get().IsMatchmaking();
             if (loader.activeSelf != matchmaking)
                 loader.SetActive(matchmaking);
@@ -71,6 +74,9 @@ namespace TcgEngine.UI
                 MatchmakingPanel.Get().SetVisible(matchmaking);
         }
 
+        /// <summary>
+        /// 尝试刷新登录状态，如果已登录则进入主菜单，否则跳转登录界面
+        /// </summary>
         private async void RefreshLogin()
         {
             bool success = await Authenticator.Get().RefreshLogin();
@@ -80,25 +86,31 @@ namespace TcgEngine.UI
                 SceneNav.GoTo("LoginMenu");
         }
 
+        /// <summary>
+        /// 登录后初始化玩家数据和事件
+        /// </summary>
         private void AfterLogin()
         {
             BlackPanel.Get().Hide();
 
-            //Events
+            // 注册匹配事件
             GameClientMatchmaker matchmaker = GameClientMatchmaker.Get();
             matchmaker.onMatchmaking += OnMatchmakingDone;
             matchmaker.onMatchList += OnReceiveObserver;
 
-            //Deck
+            // 读取玩家默认牌组
             GameClient.player_settings.deck.tid = PlayerPrefs.GetString("tcg_deck_" + Authenticator.Get().Username, "");
 
-            //UserData
+            // 刷新玩家信息
             RefreshUserData();
 
-            //Friend list
+            // 好友列表（可选显示）
             //FriendPanel.Get().Show();
         }
 
+        /// <summary>
+        /// 刷新玩家数据
+        /// </summary>
         public async void RefreshUserData()
         {
             UserData user = await Authenticator.Get().LoadUserData();
@@ -106,15 +118,18 @@ namespace TcgEngine.UI
             {
                 username_txt.text = user.username;
                 credits_txt.text = GameUI.FormatNumber(user.coins);
-                
+
                 AvatarData avatar = AvatarData.Get(user.avatar);
                 this.avatar.SetAvatar(avatar);
 
-                //Decks
+                // 刷新牌组列表
                 RefreshDeckList();
             }
         }
 
+        /// <summary>
+        /// 刷新牌组列表 UI
+        /// </summary>
         public void RefreshDeckList()
         {
             deck_selector.SetupUserDeckList();
@@ -122,6 +137,9 @@ namespace TcgEngine.UI
             RefreshDeck(deck_selector.GetDeckID());
         }
 
+        /// <summary>
+        /// 刷新牌组预览
+        /// </summary>
         private void RefreshDeck(string tid)
         {
             if (deck_preview != null)
@@ -130,6 +148,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 牌组切换回调
+        /// </summary>
         private void OnChangeDeck(string tid)
         {
             GameClient.player_settings.deck = deck_selector.GetDeck();
@@ -137,6 +158,9 @@ namespace TcgEngine.UI
             RefreshDeck(tid);
         }
 
+        /// <summary>
+        /// 匹配完成回调
+        /// </summary>
         private void OnMatchmakingDone(MatchmakingResult result)
         {
             if (result == null)
@@ -153,6 +177,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 接收到观察者匹配列表
+        /// </summary>
         private void OnReceiveObserver(MatchList list)
         {
             MatchListItem target = null;
@@ -168,6 +195,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 启动游戏（根据游戏类型和模式）
+        /// </summary>
         public void StartGame(GameType type, GameMode mode)
         {
             string uid = GameTool.GenerateRandomID();
@@ -176,24 +206,33 @@ namespace TcgEngine.UI
             StartGame(uid); 
         }
 
+        /// <summary>
+        /// 启动游戏（指定游戏 UID 和服务器）
+        /// </summary>
         public void StartGame(GameType type, string game_uid, string server_url = "")
         {
             GameClient.game_settings.game_type = type;
             StartGame(game_uid, server_url);
         }
 
+        /// <summary>
+        /// 启动游戏（仅指定游戏 UID 和服务器 URL）
+        /// </summary>
         public void StartGame(string game_uid, string server_url = "")
         {
             if (!starting)
             {
                 starting = true;
-                GameClient.game_settings.server_url = server_url; //Empty server_url will use the default one in NetworkData
+                GameClient.game_settings.server_url = server_url;
                 GameClient.game_settings.game_uid = game_uid;
                 GameClientMatchmaker.Get().Disconnect();
                 FadeToScene(GameClient.game_settings.GetScene());
             }
         }
 
+        /// <summary>
+        /// 开始观察指定玩家
+        /// </summary>
         public void StartObserve(string user)
         {
             GameClient.observe_user = user;
@@ -201,11 +240,14 @@ namespace TcgEngine.UI
             GameClientMatchmaker.Get().RefreshMatchList(user);
         }
 
+        /// <summary>
+        /// 发起挑战指定玩家
+        /// </summary>
         public void StartChallenge(string user)
         {
             string self = Authenticator.Get().Username;
             if (self == user)
-                return; //Cant challenge self
+                return; // 不能挑战自己
 
             string key;
             if (self.CompareTo(user) > 0)
@@ -216,6 +258,9 @@ namespace TcgEngine.UI
             StartMathmaking(GameMode.Casual, key);
         }
 
+        /// <summary>
+        /// 开始匹配
+        /// </summary>
         public void StartMathmaking(GameMode mode, string group)
         {
             UserDeckData deck = deck_selector.GetDeck();
@@ -229,6 +274,9 @@ namespace TcgEngine.UI
             }
         }
 
+        /// <summary>
+        /// 点击单人模式
+        /// </summary>
         public void OnClickSolo()
         {
             if (!Authenticator.Get().IsConnected())
@@ -240,6 +288,9 @@ namespace TcgEngine.UI
             SoloPanel.Get().Show();
         }
 
+        /// <summary>
+        /// 点击 PvP（玩家对战）模式
+        /// </summary>
         public void OnClickPvP()
         {
             if (!Authenticator.Get().IsConnected())
@@ -255,26 +306,41 @@ namespace TcgEngine.UI
             StartMathmaking(GameMode.Ranked, "");
         }
 
+        /// <summary>
+        /// 点击冒险模式
+        /// </summary>
         public void OnClickAdventure()
         {
             AdventurePanel.Get().Show();
         }
 
+        /// <summary>
+        /// 点击加入游戏代码模式
+        /// </summary>
         public void OnClickPlayCode()
         {
             JoinCodePanel.Get().Show();
         }
         
+        /// <summary>
+        /// 取消匹配
+        /// </summary>
         public void OnClickCancelMatch()
         {
             GameClientMatchmaker.Get().StopMatchmaking();
         }
 
+        /// <summary>
+        /// 打开设置面板
+        /// </summary>
         public void OnClickSettings()
         {
             SettingsPanel.Get().Show();
         }
 
+        /// <summary>
+        /// 场景淡入淡出跳转
+        /// </summary>
         public void FadeToScene(string scene)
         {
             StartCoroutine(FadeToRun(scene));
@@ -288,6 +354,9 @@ namespace TcgEngine.UI
             SceneNav.GoTo(scene);
         }
 
+        /// <summary>
+        /// 点击注销
+        /// </summary>
         public void OnClickLogout()
         {
             TcgNetwork.Get().Disconnect();
@@ -295,11 +364,17 @@ namespace TcgEngine.UI
             FadeToScene("LoginMenu");
         }
 
+        /// <summary>
+        /// 点击退出游戏
+        /// </summary>
         public void OnClickQuit()
         {
             Application.Quit();
         }
 
+        /// <summary>
+        /// 获取 MainMenu 单例
+        /// </summary>
         public static MainMenu Get()
         {
             return instance;
