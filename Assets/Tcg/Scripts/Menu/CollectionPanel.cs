@@ -853,11 +853,12 @@ namespace TcgEngine.UI
         // ---- 辅助数据结构 -----
 
         // 用于存储卡牌+变体+数量信息，便于排序和显示
-        public struct CardDataQ
-        {
-            public CardData card;
-            public VariantData variant;
-            public int quantity;
-        }
+
+    }
+    public struct CardDataQ
+    {
+        public CardData card;
+        public VariantData variant;
+        public int quantity;
     }
 }
