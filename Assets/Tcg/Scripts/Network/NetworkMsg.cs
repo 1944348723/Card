@@ -4,15 +4,16 @@ using UnityEngine.Events;
 
 namespace TcgEngine
 {
-    //-------- Connection --------
+    //-------- 连接相关 --------
 
+    // 玩家连接消息
     public class MsgPlayerConnect : INetworkSerializable
     {
-        public string user_id;
-        public string username;
-        public string game_uid;
-        public int nb_players;
-        public bool observer; //join as observer
+        public string user_id;     // 用户 ID
+        public string username;    // 用户名
+        public string game_uid;    // 游戏唯一 ID
+        public int nb_players;     // 当前玩家数量
+        public bool observer;      // 是否以观众身份加入
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -24,11 +25,12 @@ namespace TcgEngine
         }
     }
 
+    // 玩家连接后返回消息
     public class MsgAfterConnected : INetworkSerializable
     {
-        public bool success;
-        public int player_id;
-        public Game game_data;
+        public bool success;       // 是否成功
+        public int player_id;      // 玩家 ID
+        public Game game_data;     // 游戏数据
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -58,17 +60,18 @@ namespace TcgEngine
         }
     }
 
-    //-------- Matchmaking --------
+    //-------- 匹配相关 --------
 
+    // 匹配请求消息
     public class MsgMatchmaking : INetworkSerializable
     {
-        public string user_id;
-        public string username;
-        public string group;
-        public int players;
-        public int elo;
-        public bool refresh;
-        public float time;
+        public string user_id;     // 用户 ID
+        public string username;    // 用户名
+        public string group;       // 分组
+        public int players;        // 玩家数量
+        public int elo;            // Elo 值
+        public bool refresh;       // 是否刷新
+        public float time;         // 时间
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -82,13 +85,14 @@ namespace TcgEngine
         }
     }
 
+    // 匹配结果消息
     public class MatchmakingResult : INetworkSerializable
     {
-        public bool success;
-        public int players;
-        public string group;
-        public string server_url;
-        public string game_uid;
+        public bool success;       // 是否成功
+        public int players;        // 玩家数量
+        public string group;       // 分组
+        public string server_url;  // 服务器 URL
+        public string game_uid;    // 游戏唯一 ID
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -100,9 +104,10 @@ namespace TcgEngine
         }
     }
 
+    // 匹配列表请求消息
     public class MsgMatchmakingList : INetworkSerializable
     {
-        public string username;
+        public string username;    // 用户名
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -113,9 +118,9 @@ namespace TcgEngine
     [System.Serializable]
     public struct MatchmakingListItem : INetworkSerializable
     {
-        public string group;
-        public string user_id;
-        public string username;
+        public string group;       // 分组
+        public string user_id;     // 用户 ID
+        public string username;    // 用户名
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -125,9 +130,10 @@ namespace TcgEngine
         }
     }
 
+    // 匹配列表
     public class MatchmakingList : INetworkSerializable
     {
-        public MatchmakingListItem[] items;
+        public MatchmakingListItem[] items;  // 列表项
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -138,10 +144,10 @@ namespace TcgEngine
     [System.Serializable]
     public class MatchListItem : INetworkSerializable
     {
-        public string group;
-        public string username;
-        public string game_uid;
-        public string game_url;
+        public string group;       // 分组
+        public string username;    // 用户名
+        public string game_uid;    // 游戏唯一 ID
+        public string game_url;    // 游戏 URL
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -152,9 +158,10 @@ namespace TcgEngine
         }
     }
 
+    // 匹配列表集合
     public class MatchList : INetworkSerializable
     {
-        public MatchListItem[] items;
+        public MatchListItem[] items;  // 列表项数组
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -162,12 +169,13 @@ namespace TcgEngine
         }
     }
 
-    //-------- In Game --------
+    //-------- 游戏内消息 --------
 
+    // 玩家出牌消息
     public class MsgPlayCard : INetworkSerializable
     {
-        public string card_uid;
-        public Slot slot;
+        public string card_uid;    // 卡牌唯一 ID
+        public Slot slot;          // 卡槽信息
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -176,9 +184,10 @@ namespace TcgEngine
         }
     }
 
+    // 卡牌消息
     public class MsgCard : INetworkSerializable
     {
-        public string card_uid;
+        public string card_uid;    // 卡牌唯一 ID
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -186,10 +195,11 @@ namespace TcgEngine
         }
     }
 
+    // 卡牌数值消息
     public class MsgCardValue : INetworkSerializable
     {
-        public string card_uid;
-        public int value;
+        public string card_uid;    // 卡牌唯一 ID
+        public int value;          // 数值
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -198,9 +208,10 @@ namespace TcgEngine
         }
     }
 
+    // 玩家消息
     public class MsgPlayer : INetworkSerializable
     {
-        public int player_id;
+        public int player_id;      // 玩家 ID
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -208,10 +219,11 @@ namespace TcgEngine
         }
     }
 
+    // 玩家数值消息
     public class MsgPlayerValue : INetworkSerializable
     {
-        public int player_id;
-        public int value;
+        public int player_id;      // 玩家 ID
+        public int value;          // 数值
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -220,11 +232,12 @@ namespace TcgEngine
         }
     }
 
+    // 攻击消息
     public class MsgAttack : INetworkSerializable
     {
-        public string attacker_uid;
-        public string target_uid;
-        public int damage;
+        public string attacker_uid;  // 攻击者卡牌 UID
+        public string target_uid;    // 目标卡牌 UID
+        public int damage;           // 伤害值
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -233,12 +246,15 @@ namespace TcgEngine
             serializer.SerializeValue(ref damage);
         }
     }
-
+    
+    namespace TcgEngine
+{
+    // 玩家攻击消息
     public class MsgAttackPlayer : INetworkSerializable
     {
-        public string attacker_uid;
-        public int target_id;
-        public int damage;
+        public string attacker_uid;  // 攻击者卡牌 UID
+        public int target_id;        // 目标玩家 ID
+        public int damage;           // 伤害值
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -248,11 +264,12 @@ namespace TcgEngine
         }
     }
 
+    // 释放技能消息（目标为卡牌）
     public class MsgCastAbility : INetworkSerializable
     {
-        public string ability_id;
-        public string caster_uid;
-        public string target_uid;
+        public string ability_id;    // 技能 ID
+        public string caster_uid;    // 施法者卡牌 UID
+        public string target_uid;    // 目标卡牌 UID
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -262,11 +279,12 @@ namespace TcgEngine
         }
     }
 
+    // 释放技能消息（目标为玩家）
     public class MsgCastAbilityPlayer : INetworkSerializable
     {
-        public string ability_id;
-        public string caster_uid;
-        public int target_id;
+        public string ability_id;    // 技能 ID
+        public string caster_uid;    // 施法者卡牌 UID
+        public int target_id;        // 目标玩家 ID
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -276,11 +294,12 @@ namespace TcgEngine
         }
     }
 
+    // 释放技能消息（目标为卡槽）
     public class MsgCastAbilitySlot : INetworkSerializable
     {
-        public string ability_id;
-        public string caster_uid;
-        public Slot slot;
+        public string ability_id;    // 技能 ID
+        public string caster_uid;    // 施法者卡牌 UID
+        public Slot slot;            // 目标卡槽
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -290,10 +309,11 @@ namespace TcgEngine
         }
     }
 
+    // 秘密触发消息
     public class MsgSecret : INetworkSerializable
     {
-        public string secret_uid;
-        public string triggerer_uid;
+        public string secret_uid;    // 秘密卡牌 UID
+        public string triggerer_uid; // 触发者卡牌 UID
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -302,9 +322,10 @@ namespace TcgEngine
         }
     }
 
+    // 換牌（Mulligan）消息
     public class MsgMulligan : INetworkSerializable
     {
-        public string[] cards;
+        public string[] cards;       // 选择的卡牌 UID 数组
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -312,9 +333,10 @@ namespace TcgEngine
         }
     }
 
+    // 整数消息
     public class MsgInt : INetworkSerializable
     {
-        public int value;
+        public int value;            // 整数值
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -322,10 +344,11 @@ namespace TcgEngine
         }
     }
 
+    // 聊天消息
     public class MsgChat : INetworkSerializable
     {
-        public int player_id;
-        public string msg;
+        public int player_id;        // 玩家 ID
+        public string msg;           // 消息内容
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -334,9 +357,10 @@ namespace TcgEngine
         }
     }
 
+    // 刷新全局游戏数据消息
     public class MsgRefreshAll : INetworkSerializable
     {
-        public Game game_data;
+        public Game game_data;       // 游戏数据
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
@@ -362,5 +386,7 @@ namespace TcgEngine
             }
         }
     }
+}
+
 
 }

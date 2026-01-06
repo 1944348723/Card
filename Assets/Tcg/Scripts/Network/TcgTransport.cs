@@ -5,41 +5,44 @@ using UnityEngine;
 
 namespace TcgEngine
 {
-    //Just a wrapper of UnityTransport to make it easier to replace with WebSocketTransport if planning to build for WebGL
-
+    // UnityTransport 封装类
+    // 方便以后替换为 WebSocketTransport（例如构建 WebGL 时）
     public class TcgTransport : MonoBehaviour
     {
-        //[Header("Client")]
-        //[TextArea] public string chain;
-
-        //[Header("Server")]
-        //[TextArea] public string cert;
-        //[TextArea] public string key;         //Set this on server only
-
+        // UnityTransport 组件
         private UnityTransport transport;
 
+        // 监听所有地址
         private const string listen_all = "0.0.0.0";
 
+        // 初始化 Transport
         public virtual void Init()
         {
             transport = GetComponent<UnityTransport>();
         }
 
+        // 设置为服务器模式
         public virtual void SetServer(ushort port)
         {
             transport.ConnectionData.ServerListenAddress = listen_all;
             transport.SetConnectionData(listen_all, port);
-            //transport.SetServerSecrets(cert, key);
+            // 如果需要证书，可在此设置
+            // transport.SetServerSecrets(cert, key);
         }
 
+        // 设置为客户端模式
         public virtual void SetClient(string address, ushort port)
         {
             string ip = NetworkTool.HostToIP(address);
             transport.SetConnectionData(ip, port);
-            //transport.SetClientSecrets(address, chain);
+            // 如果需要证书，可在此设置
+            // transport.SetClientSecrets(address, chain);
         }
 
+        // 获取当前地址
         public virtual string GetAddress() { return transport.ConnectionData.Address; }
+
+        // 获取当前端口
         public virtual ushort GetPort() { return transport.ConnectionData.Port; }
     }
 }

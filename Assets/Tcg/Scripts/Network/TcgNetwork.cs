@@ -7,33 +7,30 @@ using UnityEngine.Events;
 
 namespace TcgEngine
 {
-    /// <summary>
-    /// Main script handling network connection betweeen server and client
-    /// It's one of the few scripts in this asset that needs to be on a DontDestroyOnLoad object
-    /// </summary>
-
+    // 主网络管理脚本，处理服务器与客户端的连接
+    // 这是该资源包中少数需要挂在 DontDestroyOnLoad 对象上的脚本之一
     [DefaultExecutionOrder(-10)]
     [RequireComponent(typeof(NetworkManager))]
     [RequireComponent(typeof(TcgTransport))]
     public class TcgNetwork : MonoBehaviour
     {
-        public NetworkData data;
+        public NetworkData data; // 网络配置数据
 
-        //Server & Client events
-        public UnityAction onTick; //Every network tick
-        public UnityAction onConnect;  //Event when self connect, happens before onReady, before sending any data
-        public UnityAction onDisconnect; //Event when self disconnect
+        // 服务器和客户端事件
+        public UnityAction onTick;        // 每个网络帧触发
+        public UnityAction onConnect;     // 自身连接成功时触发，发生在 onReady 之前，发送任何数据之前
+        public UnityAction onDisconnect;  // 自身断开连接时触发
 
-        //Server only events
-        public UnityAction<ulong> onClientJoin; //Server event when any client connect
-        public UnityAction<ulong> onClientQuit; //Server event when any client disconnect
-        public UnityAction<ulong> onClientReady; //Server event when any client become ready
+        // 仅服务器事件
+        public UnityAction<ulong> onClientJoin;   // 客户端连接服务器时触发
+        public UnityAction<ulong> onClientQuit;   // 客户端断开连接时触发
+        public UnityAction<ulong> onClientReady;  // 客户端就绪时触发
 
+        // 客户端连接验证事件
         public delegate bool ApprovalEvent(ulong client_id, ConnectionData connect_data);
-        public ApprovalEvent checkApproval; //Additional approval validations for when a client connects
+        public ApprovalEvent checkApproval; // 客户端连接时的额外验证逻辑
 
-        //---------
-
+        // 内部组件
         private NetworkManager network;
         private TcgTransport transport;
         private NetworkMessaging messaging;
@@ -41,25 +38,26 @@ namespace TcgEngine
         private ConnectionData connection;
 
         [System.NonSerialized]
-        private static bool inited = false;
-        private static TcgNetwork instance;
+        private static bool inited = false; // 是否已初始化
+        private static TcgNetwork instance;  // 单例
 
         private const int msg_size = 1024 * 1024;
-        private bool offline_mode = false;
-        private bool connected = false;
+        private bool offline_mode = false;  // 是否为离线模式
+        private bool connected = false;     // 是否已连接
 
         void Awake()
         {
             if (instance != null && instance != this)
             {
-                Destroy(gameObject);
-                return; //Manager already exists, destroy this one
+                Destroy(gameObject); // 已有实例，销毁新对象
+                return;
             }
 
             Init();
-            DontDestroyOnLoad(gameObject);
+            DontDestroyOnLoad(gameObject); // 保持在场景切换中不销毁
         }
 
+        // 初始化网络组件
         public void Init()
         {
             if (!inited || transport == null)
@@ -82,10 +80,10 @@ namespace TcgEngine
 
         void Update()
         {
-
+            // 这里可扩展定时逻辑
         }
 
-        //Start a host (client + server)
+        // 启动主机（客户端+服务器）
         public void StartHost(ushort port)
         {
             Debug.Log("Host Server Port " + port);
@@ -98,7 +96,7 @@ namespace TcgEngine
             AfterConnected();
         }
 
-        //Start a dedicated server
+        // 启动独立服务器
         public void StartServer(ushort port)
         {
             Debug.Log("Start Server Port " + port);
@@ -111,8 +109,7 @@ namespace TcgEngine
             AfterConnected();
         }
 
-        //If is_host is set to true, it means this player created the game on a dedicated server
-        //so its still a client (not server) but is the one who selected game settings
+        // 启动客户端并连接服务器
         public void StartClient(string server_url, ushort port)
         {
             Debug.Log("Join Server: " + server_url + " " + port);
@@ -124,7 +121,7 @@ namespace TcgEngine
             network.StartClient();
         }
 
-        //Start simulated host with all networking turned off
+        // 启动离线主机，所有网络功能关闭
         public void StartHostOffline()
         {
             Debug.Log("Host Offline");
@@ -133,6 +130,7 @@ namespace TcgEngine
             AfterConnected();
         }
 
+        // 断开连接
         public void Disconnect()
         {
             if (!IsClient && !IsServer)
@@ -143,27 +141,32 @@ namespace TcgEngine
             AfterDisconnected();
         }
 
+        // 设置连接额外数据（字节数组）
         public void SetConnectionExtraData(byte[] bytes)
         {
             connection.extra = bytes;
         }
 
+        // 设置连接额外数据（字符串）
         public void SetConnectionExtraData(string data)
         {
             connection.extra = NetworkTool.SerializeString(data);
         }
 
+        // 设置连接额外数据（可序列化对象）
         public void SetConnectionExtraData<T>(T data) where T : INetworkSerializable, new()
         {
             connection.extra = NetworkTool.NetSerialize(data);
         }
 
+        // 初始化身份认证
         private async void InitAuth()
         {
             auth = Authenticator.Create(data.auth_type);
             await auth.Initialize();
         }
 
+        // 连接成功后调用
         private void AfterConnected()
         {
             if (connected)
@@ -171,10 +174,12 @@ namespace TcgEngine
 
             if (network.NetworkTickSystem != null)
                 network.NetworkTickSystem.Tick += OnTick;
+
             connected = true;
             onConnect?.Invoke();
         }
 
+        // 断开连接后调用
         private void AfterDisconnected()
         {
             if (!connected)
@@ -182,11 +187,13 @@ namespace TcgEngine
 
             if (network.NetworkTickSystem != null)
                 network.NetworkTickSystem.Tick -= OnTick;
+
             offline_mode = false;
             connected = false;
             onDisconnect?.Invoke();
         }
 
+        // 客户端连接回调
         private void OnClientConnect(ulong client_id)
         {
             if (IsServer && client_id != ServerID)
@@ -196,9 +203,10 @@ namespace TcgEngine
             }
 
             if (!IsServer)
-                AfterConnected(); //AfterConnected wasn't called yet for client
+                AfterConnected(); // 客户端连接成功后的处理
         }
 
+        // 客户端断开回调
         private void OnClientDisconnect(ulong client_id)
         {
             if (IsServer && client_id != ServerID)
@@ -211,97 +219,131 @@ namespace TcgEngine
                 AfterDisconnected();
         }
 
+        // 网络帧更新回调
         private void OnTick()
         {
             onTick?.Invoke();
         }
 
+        // 客户端连接审批回调
         private void ApprovalCheck(NetworkManager.ConnectionApprovalRequest req, NetworkManager.ConnectionApprovalResponse res)
         {
             ConnectionData connect = NetworkTool.NetDeserialize<ConnectionData>(req.Payload);
             bool approved = ApproveClient(req.ClientNetworkId, connect);
             res.Approved = approved;
         }
-
+        
+        // 审核客户端连接请求
         private bool ApproveClient(ulong client_id, ConnectionData connect)
         {
             if (client_id == ServerID)
-                return true; //Server always approve itself
+                return true; // 服务器总是通过自身连接
 
             if (offline_mode)
-                return false;
+                return false; // 离线模式不允许其他客户端连接
 
             if (connect == null)
-                return false; //Invalid data
+                return false; // 无效连接数据
 
             if (string.IsNullOrEmpty(connect.username) || string.IsNullOrEmpty(connect.user_id))
-                return false; //Invalid username
+                return false; // 用户名或用户ID无效
 
             if (checkApproval != null && !checkApproval.Invoke(client_id, connect))
-                return false; //Custom approval condition
+                return false; // 自定义审核未通过
 
-            return true; //New Client approved
+            return true; // 新客户端审核通过
         }
 
+        // 获取当前所有客户端ID
         public IReadOnlyList<ulong> GetClientsIds()
         {
             return network.ConnectedClientsIds;
         }
 
+        // 统计当前客户端数量
         public int CountClients()
         {
             if (offline_mode)
-                return 1;
+                return 1; // 离线模式下视为1个客户端
             if (IsServer && IsConnected())
                 return network.ConnectedClientsIds.Count;
             return 0;
         }
 
+        // 是否正在尝试连接（已激活但未连接）
         public bool IsConnecting()
         {
-            return IsActive() && !IsConnected(); //Trying to connect but not yet
+            return IsActive() && !IsConnected();
         }
 
+        // 是否已连接
         public bool IsConnected()
         {
             return offline_mode || network.IsServer || network.IsConnectedClient;
         }
 
+        // 网络是否已激活（客户端或服务器处于活动状态）
         public bool IsActive()
         {
             return offline_mode || network.IsServer || network.IsClient;
         }
 
+        // 当前网络地址
         public string Address
         {
             get { return transport.GetAddress(); }
         }
 
+        // 当前端口
         public ushort Port
         {
             get { return transport.GetPort(); }
         }
 
-        public ulong ClientID { get { return offline_mode ? ServerID : network.LocalClientId; } } //ID of this client (if host, will be same than ServerID), changes for every reconnection, assigned by Netcode
-        public ulong ServerID { get { return NetworkManager.ServerClientId; } } //ID of the server
+        // 当前客户端ID（如果是主机，与ServerID相同，每次重连可能变化）
+        public ulong ClientID { get { return offline_mode ? ServerID : network.LocalClientId; } }
 
+        // 服务器ID
+        public ulong ServerID { get { return NetworkManager.ServerClientId; } }
+
+        // 是否为服务器
         public bool IsServer { get { return offline_mode || network.IsServer; } }
+
+        // 是否为客户端
         public bool IsClient { get { return offline_mode || network.IsClient; } }
-        public bool IsHost { get { return IsClient && IsServer; } }     //Host is both a client and server
+
+        // 是否为主机（既是客户端又是服务器）
+        public bool IsHost { get { return IsClient && IsServer; } }
+
+        // 是否在线
         public bool IsOnline { get { return !offline_mode && IsActive(); } }
 
+        // 本地网络时间
         public NetworkTime LocalTime { get { return network.LocalTime; } }
+
+        // 服务器网络时间
         public NetworkTime ServerTime { get { return network.ServerTime; } }
+
+        // 每帧间隔（Tick）
         public float DeltaTick { get { return 1f / network.NetworkTickSystem.TickRate; } }
 
+        // 获取NetworkManager
         public NetworkManager NetworkManager { get { return network; } }
+
+        // 获取TcgTransport
         public TcgTransport Transport { get { return transport; } }
+
+        // 获取NetworkMessaging
         public NetworkMessaging Messaging { get { return messaging; } }
+
+        // 获取身份认证器
         public Authenticator Auth { get { return auth; } }
 
+        // 消息最大长度
         public static int MsgSizeMax { get { return msg_size; } }
-        public static int MsgSize => MsgSizeMax; //Old name
+        public static int MsgSize => MsgSizeMax; // 旧名称
 
+        // 获取单例实例
         public static TcgNetwork Get()
         {
             if (instance == null)
@@ -311,29 +353,34 @@ namespace TcgEngine
             }
             return instance;
         }
+
     }
 
     [System.Serializable]
     public class ConnectionData : INetworkSerializable
     {
+        // 用户ID
         public string user_id = "";
+
+        // 用户名
         public string username = "";
 
+        // 额外数据
         public byte[] extra = new byte[0];
 
-        //If you add extra data, make sure the total size of ConnectionData doesn't exceed Netcode max unfragmented msg (1400 bytes)
-        //Fragmented msg are not possible for connection data, since connection is done in a single request
-
+        // 获取额外数据的字符串形式
         public string GetExtraString()
         {
             return NetworkTool.DeserializeString(extra);
         }
 
+        // 获取额外数据的对象形式
         public T GetExtraData<T>() where T : INetworkSerializable, new()
         {
             return NetworkTool.NetDeserialize<T>(extra);
         }
 
+        // 网络序列化
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref user_id);
@@ -344,19 +391,29 @@ namespace TcgEngine
 
     public class SerializedData
     {
+        // 网络读取器
         private FastBufferReader reader;
+
+        // 序列化的数据对象
         private INetworkSerializable data;
+
+        // 预读取的字节数据
         private byte[] bytes;
 
+        // 使用读取器初始化
         public SerializedData(FastBufferReader r) { reader = r; data = null; }
+
+        // 使用数据对象初始化
         public SerializedData(INetworkSerializable d) { data = d; }
 
+        // 获取字符串数据
         public string GetString()
         {
             reader.ReadValueSafe(out string msg);
             return msg;
         }
 
+        // 获取泛型对象
         public T Get<T>() where T : INetworkSerializable, new()
         {
             if (data != null)
@@ -376,7 +433,7 @@ namespace TcgEngine
             }
         }
 
-        //PreRead in advance without knowing the object type, since FastBufferReader will get disposed by netcode
+        // 预读取数据到字节数组（提前读取，防止 FastBufferReader 被 Netcode 释放）
         public void PreRead()
         {
             int size = reader.Length - reader.Position;
@@ -384,4 +441,5 @@ namespace TcgEngine
             reader.ReadBytesSafe(ref bytes, size);
         }
     }
+
 }
