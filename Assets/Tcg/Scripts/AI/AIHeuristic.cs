@@ -5,7 +5,7 @@ using UnityEngine;
 namespace TcgEngine.AI
 {
     /// <summary>
-    /// AI 决策用到的数值与计算方式，调整这些参数可以改进你的 AI
+    /// AI 决策用到的数值与计算方式，调整这些参数可以改进AI
     /// Heuristic（启发式）：表示一个棋盘/局面状态的评分，分数高代表有利于 AI，分数低代表有利于对手
     /// Action Score（行动得分）：表示某一个具体行动的评分，如果在某状态下行动太多，将优先选择分高的行动
     /// Action Sort Order（行动排序值）：用于决定一个回合内行动执行的顺序，
