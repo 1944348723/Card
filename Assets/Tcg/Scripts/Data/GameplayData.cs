@@ -53,6 +53,8 @@ namespace TcgEngine
         /// </summary>
         /// <param name="xp">玩家经验值</param>
         /// <returns>返回玩家等级</returns>
+        // TODO: 这个函数放在这是怎么回事，而且明明是工具函数，不依赖于本身数据，还不是静态函数，UserData里也有一样的函数
+        // 或者把每级多少经验改成配置项，这样这个函数就合理一些了
         public int GetPlayerLevel(int xp)
         {
             return Mathf.FloorToInt(xp / 1000f) + 1;
