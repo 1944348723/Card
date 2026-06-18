@@ -45,7 +45,7 @@ namespace TcgEngine
         // 获取全局资源数据（单例方式）
         public static AssetData Get()
         {
-            return DataLoader.Get().assets;        // 从 DataLoader 获取 AssetData 实例
+            return DataLoader.Instance.assets;        // 从 DataLoader 获取 AssetData 实例
         }
     } 
 }

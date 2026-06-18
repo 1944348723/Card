@@ -99,7 +99,7 @@ namespace TcgEngine
         /// <returns>返回DataLoader中的GameplayData</returns>
         public static GameplayData Get()
         {
-            return DataLoader.Get().data;
+            return DataLoader.Instance.data;
         }
     }
 }

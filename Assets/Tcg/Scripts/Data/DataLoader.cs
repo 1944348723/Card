@@ -1,7 +1,5 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using TcgEngine.Client;
 
 namespace TcgEngine
 {
@@ -9,20 +7,18 @@ namespace TcgEngine
     /// 数据加载器
     /// 负责在游戏启动时加载所有游戏数据（卡牌、能力、套牌、变体等）
     /// </summary>
-    public class DataLoader : MonoBehaviour
+    public class DataLoader : SceneSingleton<DataLoader>
     {
         public GameplayData data; // 游戏玩法数据
         public AssetData assets;  // 游戏资源数据（特效、音效等）
 
-        private HashSet<string> card_ids = new HashSet<string>();    // 用于检查卡牌ID重复
-        private HashSet<string> ability_ids = new HashSet<string>(); // 用于检查能力ID重复
-        private HashSet<string> deck_ids = new HashSet<string>();    // 用于检查套牌ID重复
+        private HashSet<string> card_ids = new();    // 用于检查卡牌ID重复
+        private HashSet<string> ability_ids = new(); // 用于检查能力ID重复
+        private HashSet<string> deck_ids = new();    // 用于检查套牌ID重复
 
-        private static DataLoader instance; // 单例
-
-        void Awake()
+        protected override void Awake()
         {
-            instance = this;   // 初始化单例
+            base.Awake();       // 单例
             LoadData();        // 加载所有数据
         }
 
@@ -170,14 +166,6 @@ namespace TcgEngine
             VariantData dvariant = VariantData.GetDefault();
             if(dvariant == null)
                 Debug.LogError("No default variant data found, make sure you have a default VariantData"); // 默认变体不存在
-        }
-
-        /// <summary>
-        /// 获取DataLoader单例
-        /// </summary>
-        public static DataLoader Get()
-        {
-            return instance;
         }
     }
 }
