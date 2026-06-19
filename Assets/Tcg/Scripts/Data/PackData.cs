@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -32,7 +31,7 @@ namespace TcgEngine
         public bool available = true;      // 是否可购买
         public int cost = 100;             // 购买费用
 
-        public static List<PackData> pack_list = new List<PackData>(); // 所有卡包列表
+        public static List<PackData> pack_list = new(); // 所有卡包列表
 
         /// <summary>
         /// 加载所有PackData资源

@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -15,7 +14,7 @@ namespace TcgEngine
         public Sprite icon;    // 稀有度图标
         public int rank;       // 稀有度等级索引，从1开始（普通）依次递增
 
-        public static List<RarityData> rarity_list = new List<RarityData>(); // 所有稀有度数据列表
+        private static List<RarityData> rarity_list = new(); // 所有稀有度数据列表
 
         /// <summary>
         /// 加载Resources下的所有RarityData资源
@@ -35,7 +34,7 @@ namespace TcgEngine
         {
             int lowest = 99999;
             RarityData first = null;
-            foreach (RarityData rarity in GetAll())
+            foreach (RarityData rarity in rarity_list)
             {
                 if (rarity.rank < lowest)
                 {
@@ -44,30 +43,6 @@ namespace TcgEngine
                 }
             }
             return first;
-        }
-
-        /// <summary>
-        /// 根据ID获取稀有度数据
-        /// </summary>
-        /// <param name="id">稀有度ID</param>
-        /// <returns>返回对应RarityData对象</returns>
-        public static RarityData Get(string id)
-        {
-            foreach (RarityData rarity in GetAll())
-            {
-                if (rarity.id == id)
-                    return rarity;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// 获取所有稀有度数据
-        /// </summary>
-        /// <returns>返回所有RarityData列表</returns>
-        public static List<RarityData> GetAll()
-        {
-            return rarity_list;
         }
     }
 }

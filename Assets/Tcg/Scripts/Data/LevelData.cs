@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -33,7 +32,7 @@ namespace TcgEngine
         public CardData[] reward_cards;   // 奖励卡牌
         public DeckData[] reward_decks;   // 奖励卡组
 
-        public static List<LevelData> level_list = new List<LevelData>(); // 所有关卡数据列表
+        public static List<LevelData> level_list = new(); // 所有关卡数据列表
 
         /// <summary>
         /// 加载所有LevelData资源

@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -60,7 +59,7 @@ namespace TcgEngine
         [Header("AI")]
         public int hvalue;           //AI对状态的权重，用于决策
 
-        public static List<StatusData> status_list = new List<StatusData>(); //所有状态数据列表
+        public static List<StatusData> status_list = new(); //所有状态数据列表
 
         /// <summary>
         /// 获取状态名称
@@ -81,6 +80,7 @@ namespace TcgEngine
         /// <summary>
         /// 获取状态描述，可替换 <value> 为指定数值
         /// </summary>
+        // TODO: 函数名不合适
         public string GetDesc(int value)
         {
             string des = desc.Replace("<value>", value.ToString());

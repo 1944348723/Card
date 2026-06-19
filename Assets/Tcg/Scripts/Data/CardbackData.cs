@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -17,7 +16,7 @@ namespace TcgEngine
         public int sort_order;    // 排序顺序，用于列表显示
 
         // 存储所有加载的卡牌背面数据，方便全局访问
-        public static List<CardbackData> cardback_list = new List<CardbackData>();
+        public static List<CardbackData> cardback_list = new();
 
         /// <summary>
         /// 从资源文件夹加载所有 CardbackData

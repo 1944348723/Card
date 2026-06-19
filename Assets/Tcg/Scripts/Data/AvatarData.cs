@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -16,7 +15,7 @@ namespace TcgEngine
         public int sort_order;    // 排序顺序，用于列表显示
 
         // 存储所有加载的头像数据，方便全局访问
-        public static List<AvatarData> avatar_list = new List<AvatarData>();
+        public static List<AvatarData> avatar_list = new();
 
         /// <summary>
         /// 从资源文件夹加载所有 AvatarData

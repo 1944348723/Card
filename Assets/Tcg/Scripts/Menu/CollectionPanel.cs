@@ -646,7 +646,7 @@ namespace TcgEngine.UI
             filter_team = null;
             if (button.IsActive())
             {
-                foreach (TeamData team in TeamData.GetAll())
+                foreach (TeamData team in TeamData.AllTeams())
                 {
                     if (button.value == team.id)
                         filter_team = team; // 设置当前队伍筛选条件

@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -19,7 +18,7 @@ namespace TcgEngine
         public int cost_factor = 1;        //影响卡牌费用的系数
         public bool is_default;            //是否为默认变体
 
-        public static List<VariantData> variant_list = new List<VariantData>(); //存放所有变体数据列表
+        public static List<VariantData> variant_list = new(); //存放所有变体数据列表
 
         /// <summary>
         /// 获取变体的后缀（用于命名或资源路径）

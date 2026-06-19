@@ -20,7 +20,7 @@ namespace TcgEngine
         public CardData hero; // 套牌中的英雄卡
         public CardData[] cards; // 套牌中的其他卡牌列表
 
-        public static List<DeckData> deck_list = new List<DeckData>(); // 静态列表，保存所有加载的套牌数据
+        public static List<DeckData> deck_list = new(); // 静态列表，保存所有加载的套牌数据
 
         /// <summary>
         /// 从 Resources 文件夹加载所有 DeckData
@@ -43,6 +43,7 @@ namespace TcgEngine
         /// <summary>
         /// 判断套牌是否有效（卡牌数量是否达到规定的 deck_size）
         /// </summary>
+        // TODO: 目前的牌组似乎都没有达到deck_size要求，这个函数也没有被调用过
         public bool IsValid()
         {
             return cards.Length >= GameplayData.Get().deck_size;

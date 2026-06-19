@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -21,7 +20,7 @@ namespace TcgEngine
 
         public bool repeat = true; // 是否可重复领取
 
-        public static List<RewardData> reward_list = new List<RewardData>(); // 所有奖励数据列表
+        public static List<RewardData> reward_list = new(); // 所有奖励数据列表
 
         /// <summary>
         /// 加载Resources下的所有RewardData资源

@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using TcgEngine.Gameplay;
 
@@ -72,9 +71,9 @@ namespace TcgEngine
         public string desc;
         // 技能描述文本，可包含占位符 <name>、<value>、<duration>
 
-        public static List<AbilityData> ability_list = new List<AbilityData>();                             
+        public static List<AbilityData> ability_list = new();                             
         // 静态列表缓存所有技能，用于循环快速访问
-        public static Dictionary<string, AbilityData> ability_dict = new Dictionary<string, AbilityData>(); 
+        public static Dictionary<string, AbilityData> ability_dict = new(); 
         // 静态字典缓存技能ID到技能对象映射，加快按ID查找
 
         public static void Load(string folder = "")

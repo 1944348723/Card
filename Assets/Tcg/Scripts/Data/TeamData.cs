@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -16,7 +15,7 @@ namespace TcgEngine
         public Sprite icon;     //阵营图标
         public Color color;     //阵营颜色，用于UI显示或卡牌边框
 
-        public static List<TeamData> team_list = new List<TeamData>(); //存放所有加载的阵营数据列表
+        private static List<TeamData> team_list = new(); //存放所有加载的阵营数据列表
 
         /// <summary>
         /// 从Resources加载所有阵营数据
@@ -29,22 +28,9 @@ namespace TcgEngine
         }
 
         /// <summary>
-        /// 根据ID获取阵营数据
-        /// </summary>
-        public static TeamData Get(string id)
-        {
-            foreach (TeamData team in GetAll())
-            {
-                if (team.id == id)
-                    return team;
-            }
-            return null;
-        }
-
-        /// <summary>
         /// 获取所有阵营数据
         /// </summary>
-        public static List<TeamData> GetAll()
+        public static IReadOnlyList<TeamData> AllTeams()
         {
             return team_list;
         }
