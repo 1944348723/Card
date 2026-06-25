@@ -28,6 +28,7 @@ namespace TcgEngine
         public Dictionary<string, Card> cards_all = new(); // 所有卡片字典，便于通过UID快速访问
         public Card hero = null; // 英雄卡
 
+        // 所有卡牌区域，具有互斥性，同时只可能在一个区域中
         public List<Card> cards_deck = new(); // 玩家牌库
         public List<Card> cards_hand = new(); // 玩家手牌
         public List<Card> cards_board = new(); // 玩家场上卡牌

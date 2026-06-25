@@ -20,7 +20,7 @@ namespace TcgEngine
         public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
         {
             // 从玩家手牌中丢弃前 ability.value 张卡
-            logic.DrawDiscardCard(target, ability.value);
+            logic.DiscardCardsFromHand(target, ability.value);
         }
 
         // 对卡牌执行丢弃效果

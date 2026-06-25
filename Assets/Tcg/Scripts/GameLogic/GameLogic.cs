@@ -127,7 +127,7 @@ namespace TcgEngine.Gameplay
 
                 // 抽取初始手牌
                 int cards_count = pdeck != null ? pdeck.start_cards : GameplayData.Get().cards_start;
-                DrawCard(player, cards_count);
+                DrawCards(player, cards_count);
 
                 // 给第二位玩家添加额外金币卡
                 bool is_random = (level == null) || (level.first_player == LevelFirst.Random);
@@ -162,7 +162,7 @@ namespace TcgEngine.Gameplay
             // 抽牌
             if (game_data.turn_count > 1 || player.player_id != game_data.first_player)
             {
-                DrawCard(player, GameplayData.Get().cards_per_turn);
+                DrawCards(player, GameplayData.Get().cards_per_turn);
             }
 
             // 增加法力值
@@ -415,65 +415,63 @@ namespace TcgEngine.Gameplay
         // 出牌操作
         public virtual void PlayCard(Card card, Slot slot, bool skip_cost = false)
         {
-            if (game_data.CanPlayCard(card, slot, skip_cost))
+            if (!game_data.CanPlayCard(card, slot, skip_cost)) return;
+
+            Player player = game_data.GetPlayer(card.player_id);
+
+            // 扣除法力
+            if (!skip_cost)
+                player.PayMana(card);
+
+            // 从所有区域移除该卡牌
+            player.RemoveCardFromAllGroups(card);
+
+            // 放置到目标位置
+            CardData icard = card.CardData;
+            if (icard.IsBoardCard())
             {
-                Player player = game_data.GetPlayer(card.player_id);
-
-                // 扣除法力
-                if (!skip_cost)
-                    player.PayMana(card);
-
-                // 从所有区域移除该卡牌
-                player.RemoveCardFromAllGroups(card);
-
-                // 放置到目标位置
-                CardData icard = card.CardData;
-                if (icard.IsBoardCard())
-                {
-                    player.cards_board.Add(card); // 添加到场上
-                    card.slot = slot;             // 设置槽位
-                    card.exhausted = true;        // 本回合不能攻击
-                }
-                else if (icard.IsEquipment())
-                {
-                    Card bearer = game_data.GetSlotCard(slot);
-                    EquipCard(bearer, card);      // 装备卡牌
-                    card.exhausted = true;
-                }
-                else if (icard.IsSecret())
-                {
-                    player.cards_secret.Add(card); // 添加到秘密区
-                }
-                else
-                {
-                    player.cards_discard.Add(card); // 添加到弃牌堆
-                    card.slot = slot;               // 保存槽位信息
-                }
-
-                // 历史记录
-                if (!is_ai_predict && !icard.IsSecret())
-                    player.AddHistory(GameAction.PlayCard, card);
-
-                // 更新持续效果
-                game_data.last_played = card.uid;
-                UpdateOngoing();
-
-                // 触发能力
-                if (card.CardData.IsDynamicManaCost())
-                {
-                    GoToSelectorCost(card); // 如果是X费牌，进入选择费用阶段
-                }
-                else
-                {
-                    TriggerSecrets(AbilityTrigger.OnPlayOther, card); // 出牌后触发其他秘密
-                    TriggerCardAbilityType(AbilityTrigger.OnPlay, card); // 出牌触发自身能力
-                    TriggerOtherCardsAbilityType(AbilityTrigger.OnPlayOther, card); // 出牌触发其他卡牌能力
-                }
-
-                RefreshData();                  // 刷新游戏状态
-                onCardPlayed?.Invoke(card, slot);// 触发出牌事件
-                resolve_queue.ResolveAll(0.3f);  // 解析队列
+                cardZoneController.MoveToBoard(player, card, slot);
+                card.exhausted = true;        // 本回合不能攻击
             }
+            else if (icard.IsEquipment())
+            {
+                Card bearer = game_data.GetSlotCard(slot);
+                EquipCard(bearer, card);      // 装备卡牌
+                card.exhausted = true;
+            }
+            else if (icard.IsSecret())
+            {
+                cardZoneController.MoveToSecret(player, card);
+            }
+            else
+            {
+                cardZoneController.MoveToDiscard(player, card);
+                card.slot = slot;               // 保存槽位信息
+            }
+
+            // 历史记录
+            if (!is_ai_predict && !icard.IsSecret())
+                player.AddHistory(GameAction.PlayCard, card);
+
+            // 更新持续效果
+            game_data.last_played = card.uid;
+            UpdateOngoing();
+
+            // 触发能力
+            if (card.CardData.IsDynamicManaCost())
+            {
+                GoToSelectorCost(card); // 如果是X费牌，进入选择费用阶段
+            }
+            else
+            {
+                TriggerSecrets(AbilityTrigger.OnPlayOther, card); // 出牌后触发其他秘密
+                TriggerCardAbilityType(AbilityTrigger.OnPlay, card); // 出牌触发自身能力
+                TriggerOtherCardsAbilityType(AbilityTrigger.OnPlayOther, card); // 出牌触发其他卡牌能力
+            }
+
+            RefreshData();                  // 刷新游戏状态
+            onCardPlayed?.Invoke(card, slot);// 触发出牌事件
+            resolve_queue.ResolveAll(0.3f);  // 解析队列
         }
 
         // 移动卡牌操作
@@ -704,24 +702,16 @@ namespace TcgEngine.Gameplay
         }
 
         // 抽牌
-        public virtual void DrawCard(Player player, int nb = 1)
+        public virtual void DrawCards(Player player, int count = 1)
         {
-            cardZoneController.DrawCards(player, nb);
-            onCardDrawn?.Invoke(nb); // 触发抽牌事件
+            cardZoneController.DrawCards(player, count);
+            // TODO: 考虑改成实际抽的牌数，目前不知道这个数量是怎么使用的，暂时不改
+            onCardDrawn?.Invoke(count); // 触发抽牌事件
         }
 
-        // 从牌库直接放入弃牌堆
-        public virtual void DrawDiscardCard(Player player, int nb = 1)
+        public virtual void DiscardCardsFromHand(Player player, int count = 1)
         {
-            for (int i = 0; i < nb; i++)
-            {
-                if (player.cards_deck.Count > 0)
-                {
-                    Card card = player.cards_deck[0];
-                    player.cards_deck.RemoveAt(0);
-                    player.cards_discard.Add(card);
-                }
-            }
+            cardZoneController.DiscardCardsFromHand(player, count);
         }
 
         // 召唤一张卡牌的复制
@@ -775,35 +765,29 @@ namespace TcgEngine.Gameplay
             return card;
         }
 
-        // 装备卡牌
-        public virtual void EquipCard(Card card, Card equipment)
+        public virtual void EquipCard(Card bearer, Card equipment)
         {
-            if (card != null && equipment != null && card.player_id == equipment.player_id)
-            {
-                if (!card.CardData.IsEquipment() && equipment.CardData.IsEquipment())
-                {
-                    UnequipAll(card); // 卸下之前装备，每次只允许一件装备
+            if (bearer == null) return;
+            Player player = game_data.GetPlayer(bearer.player_id);
 
-                    Player player = game_data.GetPlayer(card.player_id);
-                    player.RemoveCardFromAllGroups(equipment);
-                    player.cards_equip.Add(equipment);
-                    card.equipped_uid = equipment.uid; // 设置装备关联
-                    equipment.slot = card.slot;         // 装备位置与卡牌一致
-                }
+            Card oldEquipment = cardZoneController.EquipCard(player, bearer, equipment);
+
+            if (oldEquipment != null)
+            {
+                DiscardCard(oldEquipment);
             }
         }
 
         // 卸下卡牌上的所有装备
-        public virtual void UnequipAll(Card card)
+        public virtual void UnequipAll(Card bearer)
         {
-            if (card == null || card.equipped_uid == null) return;
+            if (bearer == null || bearer.equipped_uid == null) return;
+            Player player = game_data.GetPlayer(bearer.player_id);
 
-            Player player = game_data.GetPlayer(card.player_id);
-            Card equip = player.GetEquipCard(card.equipped_uid);
-            if (equip != null)
+            Card equipment = cardZoneController.UnequipCard(player, bearer);
+            if (equipment != null)
             {
-                card.equipped_uid = null;
-                DiscardCard(equip); // 卸下装备并丢弃
+                DiscardCard(equipment); // 卸下装备并丢弃
             }
         }
 
@@ -1827,7 +1811,7 @@ namespace TcgEngine.Gameplay
                 }
 
                 player.ready = true; // 玩家标记为已准备
-                DrawCard(player, count); // 抽取等量卡牌
+                DrawCards(player, count); // 抽取等量卡牌
                 RefreshData();
 
                 // 如果所有玩家都准备好，开始回合
