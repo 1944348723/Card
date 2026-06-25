@@ -1,6 +1,4 @@
-﻿using Unity.Netcode;
-using UnityEngine.Events;
-
+﻿
 namespace TcgEngine
 {
     /// <summary>

@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -27,14 +26,14 @@ namespace TcgEngine
 
         public string equipped_uid = null; // 装备的卡牌 UID
 
-        public List<CardTrait> traits = new List<CardTrait>(); // 卡牌基础特性列表
-        public List<CardTrait> ongoing_traits = new List<CardTrait>(); // 临时特性列表
+        public List<CardTrait> traits = new(); // 卡牌基础特性列表
+        public List<CardTrait> ongoing_traits = new(); // 临时特性列表
 
-        public List<CardStatus> status = new List<CardStatus>(); // 基础状态效果列表
-        public List<CardStatus> ongoing_status = new List<CardStatus>(); // 临时状态效果列表
+        public List<CardStatus> status = new(); // 基础状态效果列表
+        public List<CardStatus> ongoing_status = new(); // 临时状态效果列表
 
-        public List<string> abilities = new List<string>(); // 卡牌基础技能 ID 列表
-        public List<string> abilities_ongoing = new List<string>(); // 临时技能 ID 列表
+        public List<string> abilities = new(); // 卡牌基础技能 ID 列表
+        public List<string> abilities_ongoing = new(); // 临时技能 ID 列表
 
         // 非序列化字段，不会保存到数据中
         [System.NonSerialized] private int hash = 0;
@@ -43,7 +42,50 @@ namespace TcgEngine
         [System.NonSerialized] private List<AbilityData> abilities_data = null; // 技能数据列表
 
         // 构造函数
-        public Card(string card_id, string uid, int player_id) { this.card_id = card_id; this.uid = uid; this.player_id = player_id; }
+        // 外部通过静态函数构造
+        private Card(string card_id, string uid, int player_id) { this.card_id = card_id; this.uid = uid; this.player_id = player_id; }
+        
+        // 设置卡牌数据和变体
+        public virtual void SetCard(CardData icard, VariantData cvariant)
+        {
+            data = icard;
+            card_id = icard.id;
+            vdata = cvariant;
+            variant_id = cvariant.id;
+            
+            attack = icard.attack;
+            hp = icard.hp;
+            mana = icard.mana;
+            SetTraits(icard); // 设置特性
+            SetAbilities(icard); // 设置技能
+        }
+
+        // 初始化卡牌特性
+        public void SetTraits(CardData icard)
+        {
+            traits.Clear();
+            ongoing_traits.Clear();
+            foreach (TraitData trait in icard.traits)
+            {
+                SetTrait(trait.id, 0);
+            }
+            foreach (TraitStat stat in icard.stats)
+            {
+                SetTrait(stat.trait.id, stat.value);
+            }
+        }
+
+        // 初始化卡牌技能
+        public void SetAbilities(CardData icard)
+        {
+            abilities.Clear();
+            abilities_ongoing.Clear();
+            abilities_data?.Clear();
+            foreach (AbilityData ability in icard.abilities)
+            {
+                AddAbility(ability);
+            }
+        }
 
         // 刷新卡牌状态，默认重置疲惫状态
         public virtual void Refresh() { exhausted = false; }
@@ -85,42 +127,6 @@ namespace TcgEngine
         // 获取总法力值（基础 + 临时）
         public virtual int GetMana() { return Mathf.Max(mana + mana_ongoing, 0); }
 
-        // 设置卡牌数据和变体
-        public virtual void SetCard(CardData icard, VariantData cvariant)
-        {
-            data = icard;
-            card_id = icard.id;
-            variant_id = cvariant.id;
-            attack = icard.attack;
-            hp = icard.hp;
-            mana = icard.mana;
-            SetTraits(icard); // 设置特性
-            SetAbilities(icard); // 设置技能
-        }
-
-        // 初始化卡牌特性
-        public void SetTraits(CardData icard)
-        {
-            traits.Clear();
-            foreach (TraitData trait in icard.traits)
-                SetTrait(trait.id, 0);
-            if (icard.stats != null)
-            {
-                foreach (TraitStat stat in icard.stats)
-                    SetTrait(stat.trait.id, stat.value);
-            }
-        }
-
-        // 初始化卡牌技能
-        public void SetAbilities(CardData icard)
-        {
-            abilities.Clear();
-            abilities_ongoing.Clear();
-            if (abilities_data != null)
-                abilities_data.Clear();
-            foreach (AbilityData ability in icard.abilities)
-                AddAbility(ability);
-        }
         
         //------ 自定义特性/状态方法 ---------
 
@@ -382,8 +388,7 @@ namespace TcgEngine
         public void AddAbility(AbilityData ability)
         {
             abilities.Add(ability.id);
-            if (abilities_data != null)
-                abilities_data.Add(ability);
+            abilities_data?.Add(ability);
         }
 
         // 移除基础技能
@@ -591,7 +596,7 @@ namespace TcgEngine
         // 创建卡牌并指定 UID
         public static Card Create(CardData icard, VariantData ivariant, Player player, string uid)
         {
-            Card card = new Card(icard.id, uid, player.player_id);
+            Card card = new(icard.id, uid, player.player_id);
             card.SetCard(icard, ivariant);
             player.cards_all[card.uid] = card; // 添加到玩家卡牌字典
             return card;
@@ -600,7 +605,7 @@ namespace TcgEngine
         // 克隆一张卡牌，返回新对象
         public static Card CloneNew(Card source)
         {
-            Card card = new Card(source.card_id, source.uid, source.player_id);
+            Card card = new(source.card_id, source.uid, source.player_id);
             Clone(source, card);
             return card;
         }
@@ -726,8 +731,10 @@ namespace TcgEngine
         // 克隆新对象
         public static CardStatus CloneNew(CardStatus copy)
         {
-            CardStatus status = new CardStatus(copy.type, copy.value, copy.duration);
-            status.permanent = copy.permanent;
+            CardStatus status = new(copy.type, copy.value, copy.duration)
+            {
+                permanent = copy.permanent
+            };
             return status;
         }
 
@@ -798,7 +805,7 @@ namespace TcgEngine
         // 克隆一个新的 CardTrait 对象
         public static CardTrait CloneNew(CardTrait copy)
         {
-            CardTrait trait = new CardTrait(copy.id, copy.value);
+            CardTrait trait = new(copy.id, copy.value);
             return trait;
         }
 

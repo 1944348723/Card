@@ -50,29 +50,31 @@ namespace TcgEngine.Gameplay
         public UnityAction onRefresh;                       // 刷新事件
 
         private Game game_data;                              // 游戏数据引用
+        private CardZoneController cardZoneController;
 
         private ResolveQueue resolve_queue;                  // 处理队列
         private bool is_ai_predict = false;                 // 是否用于AI预测
 
-        private System.Random random = new System.Random(); // 随机数生成器
+        private System.Random random = new(); // 随机数生成器
 
-        private ListSwap<Card> card_array = new ListSwap<Card>();         // 临时卡牌列表
-        private ListSwap<Player> player_array = new ListSwap<Player>();   // 临时玩家列表
-        private ListSwap<Slot> slot_array = new ListSwap<Slot>();         // 临时槽位列表
-        private ListSwap<CardData> card_data_array = new ListSwap<CardData>(); // 临时卡牌数据列表
-        private List<Card> cards_to_clear = new List<Card>();             // 待清理的卡牌列表
+        private ListSwap<Card> card_array = new();         // 临时卡牌列表
+        private ListSwap<Player> player_array = new();   // 临时玩家列表
+        private ListSwap<Slot> slot_array = new();         // 临时槽位列表
+        private ListSwap<CardData> card_data_array = new(); // 临时卡牌数据列表
+        private List<Card> cards_to_clear = new();             // 待清理的卡牌列表
 
         public GameLogic(bool is_ai)
         {
-            // is_instant 忽略所有游戏延迟，立即处理所有操作，用于AI预测
             resolve_queue = new ResolveQueue(null, is_ai);
             is_ai_predict = is_ai;
+            cardZoneController = new();
         }
 
         public GameLogic(Game game)
         {
             game_data = game;
             resolve_queue = new ResolveQueue(game, false);
+            cardZoneController = new();
         }
 
         public virtual void SetData(Game game)
@@ -90,8 +92,7 @@ namespace TcgEngine.Gameplay
 
         public virtual void StartGame()
         {
-            if (game_data.state == GameState.GameEnded)
-                return;
+            if (game_data.state == GameState.GameEnded) return;
 
             // 选择先手玩家
             game_data.state = GameState.Play;
@@ -125,11 +126,11 @@ namespace TcgEngine.Gameplay
                 player.mana = player.mana_max;
 
                 // 抽取初始手牌
-                int dcards = pdeck != null ? pdeck.start_cards : GameplayData.Get().cards_start;
-                DrawCard(player, dcards);
+                int cards_count = pdeck != null ? pdeck.start_cards : GameplayData.Get().cards_start;
+                DrawCard(player, cards_count);
 
                 // 给第二位玩家添加额外金币卡
-                bool is_random = level == null || level.first_player == LevelFirst.Random;
+                bool is_random = (level == null) || (level.first_player == LevelFirst.Random);
                 if (is_random && player.player_id != game_data.first_player && GameplayData.Get().second_bonus != null)
                 {
                     Card card = Card.Create(GameplayData.Get().second_bonus, VariantData.GetDefault(), player);
@@ -149,8 +150,7 @@ namespace TcgEngine.Gameplay
 
         public virtual void StartTurn()
         {
-            if (game_data.state == GameState.GameEnded)
-                return;
+            if (game_data.state == GameState.GameEnded) return;
 
             ClearTurnData();                   // 清理上回合数据
             game_data.phase = GamePhase.StartTurn;
@@ -175,11 +175,9 @@ namespace TcgEngine.Gameplay
             player.history_list.Clear();
 
             // 中毒处理
-            if (player.HasStatus(StatusType.Poisoned))
-                player.hp -= player.GetStatusValue(StatusType.Poisoned);
+            player.hp -= player.GetStatusValue(StatusType.Poisoned);
 
-            if (player.hero != null)
-                player.hero.Refresh(); // 刷新英雄状态
+            player.hero?.Refresh(); // 刷新英雄状态
 
             // 刷新场上卡牌及状态效果
             for (int i = player.cards_board.Count - 1; i >= 0; i--)
@@ -708,16 +706,7 @@ namespace TcgEngine.Gameplay
         // 抽牌
         public virtual void DrawCard(Player player, int nb = 1)
         {
-            for (int i = 0; i < nb; i++)
-            {
-                if (player.cards_deck.Count > 0 && player.cards_hand.Count < GameplayData.Get().cards_max)
-                {
-                    Card card = player.cards_deck[0];
-                    player.cards_deck.RemoveAt(0);
-                    player.cards_hand.Add(card);
-                }
-            }
-
+            cardZoneController.DrawCards(player, nb);
             onCardDrawn?.Invoke(nb); // 触发抽牌事件
         }
 
@@ -807,15 +796,14 @@ namespace TcgEngine.Gameplay
         // 卸下卡牌上的所有装备
         public virtual void UnequipAll(Card card)
         {
-            if (card != null && card.equipped_uid != null)
+            if (card == null || card.equipped_uid == null) return;
+
+            Player player = game_data.GetPlayer(card.player_id);
+            Card equip = player.GetEquipCard(card.equipped_uid);
+            if (equip != null)
             {
-                Player player = game_data.GetPlayer(card.player_id);
-                Card equip = player.GetEquipCard(card.equipped_uid);
-                if (equip != null)
-                {
-                    card.equipped_uid = null;
-                    DiscardCard(equip); // 卸下装备并丢弃
-                }
+                card.equipped_uid = null;
+                DiscardCard(equip); // 卸下装备并丢弃
             }
         }
 
@@ -882,6 +870,7 @@ namespace TcgEngine.Gameplay
             if (target.HasStatus(StatusType.Invincibility))
                 return; // 无敌状态
 
+            // TODO: 通用伤害怎么定义，包含哪些，一定算法术吗？目前来看似乎只有中毒伤害
             if (target.HasStatus(StatusType.SpellImmunity))
                 return; // 法术免疫
 
@@ -971,13 +960,8 @@ namespace TcgEngine.Gameplay
         // 将卡牌丢入弃牌堆
         public virtual void DiscardCard(Card card)
         {
-            if (card == null)
-                return;
+            if (card == null || game_data.IsInDiscard(card)) return;
 
-            if (game_data.IsInDiscard(card))
-                return; // 已经在弃牌堆
-
-            CardData icard = card.CardData;
             Player player = game_data.GetPlayer(card.player_id);
             bool was_on_board = game_data.IsOnBoard(card) || game_data.IsEquipped(card);
 

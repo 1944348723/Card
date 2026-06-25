@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using Unity.Netcode;
+﻿using Unity.Netcode;
 
 namespace TcgEngine
 {
@@ -22,6 +19,19 @@ namespace TcgEngine
     {
         Casual = 0,    // 休闲模式
         Ranked = 10,   // 排位模式
+    }
+
+    public static class GameModeExtensions
+    {
+        public static string ToId(this GameMode mode)
+        {
+            return mode switch
+            {
+                GameMode.Casual => "Casual",
+                GameMode.Ranked => "Ranked",
+                _ => ""
+            };
+        }
     }
 
     /// <summary>
@@ -89,11 +99,7 @@ namespace TcgEngine
         // 获取游戏模式字符串
         public virtual string GetGameModeId()
         {
-            if (game_mode == GameMode.Ranked)
-                return "ranked";
-            if (game_mode == GameMode.Casual)
-                return "casual";
-            return "";
+            return game_mode.ToId();
         }
 
         // 获取冒险模式关卡数据
@@ -118,39 +124,21 @@ namespace TcgEngine
             serializer.SerializeValue(ref level);
         }
 
-        // 静态方法：将GameMode转为字符串
-        public static string GetRankModeString(GameMode rank_mode)
-        {
-            if (rank_mode == GameMode.Ranked)
-                return "ranked";
-            if (rank_mode == GameMode.Casual)
-                return "casual";
-            return "";
-        }
-
-        // 静态方法：将字符串转为GameMode
-        public static GameMode GetRankMode(string rank_id)
-        {
-            if (rank_id == "ranked")
-                return GameMode.Ranked;
-            if (rank_id == "casual")
-                return GameMode.Casual;
-            return GameMode.Casual;
-        }
-
         // 默认游戏设置
         public static GameSettings Default
         {
             get
             {
-                GameSettings settings = new GameSettings();
-                settings.server_url = "";
-                settings.game_uid = "test";
-                settings.game_type = GameType.Solo;
-                settings.game_mode = GameMode.Casual;
-                settings.nb_players = 2;
-                settings.scene = "Game";
-                settings.level = "";
+                GameSettings settings = new()
+                {
+                    server_url = "",
+                    game_uid = "test",
+                    game_type = GameType.Solo,
+                    game_mode = GameMode.Casual,
+                    nb_players = 2,
+                    scene = "Game",
+                    level = ""
+                };
                 return settings;
             }
         }
@@ -190,12 +178,14 @@ namespace TcgEngine
         {
             get
             {
-                PlayerSettings settings = new PlayerSettings();
-                settings.username = "Player";
-                settings.avatar = "";
-                settings.cardback = "";
-                settings.deck = UserDeckData.Default;
-                settings.ai_level = 1;
+                PlayerSettings settings = new()
+                {
+                    username = "Player",
+                    avatar = "",
+                    cardback = "",
+                    deck = UserDeckData.Default,
+                    ai_level = 1
+                };
                 return settings;
             }
         }
@@ -205,12 +195,14 @@ namespace TcgEngine
         {
             get
             {
-                PlayerSettings settings = new PlayerSettings();
-                settings.username = "AI";
-                settings.avatar = "";
-                settings.cardback = "";
-                settings.deck = UserDeckData.Default;
-                settings.ai_level = 10;
+                PlayerSettings settings = new()
+                {
+                    username = "AI",
+                    avatar = "",
+                    cardback = "",
+                    deck = UserDeckData.Default,
+                    ai_level = 10
+                };
                 return settings;
             }
         }

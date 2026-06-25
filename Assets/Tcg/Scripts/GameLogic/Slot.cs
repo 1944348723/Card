@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
 
@@ -24,8 +23,8 @@ namespace TcgEngine
 
         public static bool ignore_p = false; // 如果不想使用 P 值则设置为 true
 
-        private static Dictionary<int, List<Slot>> player_slots = new Dictionary<int, List<Slot>>(); // 玩家槽位字典
-        private static List<Slot> all_slots = new List<Slot>(); // 所有有效槽位列表
+        private static Dictionary<int, List<Slot>> player_slots = new(); // 玩家槽位字典
+        private static List<Slot> all_slots = new(); // 所有有效槽位列表
 
         // 构造函数，使用玩家ID初始化
         public Slot(int pid)

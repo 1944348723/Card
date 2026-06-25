@@ -1,6 +1,4 @@
-using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace TcgEngine
 {
@@ -14,12 +12,12 @@ namespace TcgEngine
         /// <summary>
         /// 第一个列表
         /// </summary>
-        public List<T> swap1 = new List<T>();
+        public List<T> swap1 = new();
 
         /// <summary>
         /// 第二个列表
         /// </summary>
-        public List<T> swap2 = new List<T>();
+        public List<T> swap2 = new();
 
         /// <summary>
         /// 获取任意一个可用列表（默认返回 swap1）

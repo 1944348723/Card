@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using System.Collections.Generic;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
@@ -13,8 +11,9 @@ namespace TcgEngine
     public static class GameTool
     {
         private const string uid_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        private static System.Random random = new System.Random();
+        private static readonly System.Random random = new();
 
+        // TODO: 当前项目UID没有防碰撞机制，完全依赖于碰撞概率极低，应该要有防碰撞
         /// <summary>
         /// 生成一个随机字符串，可用作唯一 ID（UID）
         /// </summary>
@@ -27,7 +26,7 @@ namespace TcgEngine
             string unique_id = "";
             for (int i = 0; i < length; i++)
             {
-                unique_id += uid_chars[random.Next(uid_chars.Length - 1)];
+                unique_id += uid_chars[random.Next(uid_chars.Length)];
             }
             return unique_id;
         }
@@ -120,8 +119,7 @@ namespace TcgEngine
             }
 
             // dest 为 null，创建新列表
-            if (dest == null)
-                dest = new List<T>();
+            dest ??= new List<T>();
 
             // 两者都不为 null，进行克隆
             CloneListRef(source, dest);

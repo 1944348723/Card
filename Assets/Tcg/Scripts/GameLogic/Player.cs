@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace TcgEngine
@@ -26,24 +25,24 @@ namespace TcgEngine
         public int mana_max = 0; // 最大法力值
         public int kill_count = 0; // 击杀计数
 
-        public Dictionary<string, Card> cards_all = new Dictionary<string, Card>(); // 所有卡片字典，便于通过UID快速访问
+        public Dictionary<string, Card> cards_all = new(); // 所有卡片字典，便于通过UID快速访问
         public Card hero = null; // 英雄卡
 
-        public List<Card> cards_deck = new List<Card>(); // 玩家牌库
-        public List<Card> cards_hand = new List<Card>(); // 玩家手牌
-        public List<Card> cards_board = new List<Card>(); // 玩家场上卡牌
-        public List<Card> cards_equip = new List<Card>(); // 装备卡牌
-        public List<Card> cards_discard = new List<Card>(); // 弃牌区
-        public List<Card> cards_secret = new List<Card>(); // 秘密区（法术陷阱等）
-        public List<Card> cards_temp = new List<Card>(); // 临时生成的卡牌，尚未分配到任何区域
+        public List<Card> cards_deck = new(); // 玩家牌库
+        public List<Card> cards_hand = new(); // 玩家手牌
+        public List<Card> cards_board = new(); // 玩家场上卡牌
+        public List<Card> cards_equip = new(); // 装备卡牌
+        public List<Card> cards_discard = new(); // 弃牌区
+        public List<Card> cards_secret = new(); // 秘密区（法术陷阱等）
+        public List<Card> cards_temp = new(); // 临时生成的卡牌，尚未分配到任何区域
 
-        public List<CardTrait> traits = new List<CardTrait>(); // 当前持久性特性
-        public List<CardTrait> ongoing_traits = new List<CardTrait>(); // 当前持续性特性
+        public List<CardTrait> traits = new(); // 当前持久性特性
+        public List<CardTrait> ongoing_traits = new(); // 当前持续性特性
 
-        public List<CardStatus> status = new List<CardStatus>(); // 当前持久状态/带持续时间的状态
-        public List<CardStatus> ongoing_status = new List<CardStatus>(); // 当前持续状态
+        public List<CardStatus> status = new(); // 当前持久状态/带持续时间的状态
+        public List<CardStatus> ongoing_status = new(); // 当前持续状态
 
-        public List<ActionHistory> history_list = new List<ActionHistory>(); // 玩家执行的动作历史记录
+        public List<ActionHistory> history_list = new(); // 玩家执行的动作历史记录
 
         public Player(int id)
         {

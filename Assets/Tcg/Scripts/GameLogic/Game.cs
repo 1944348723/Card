@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using System.Collections.Generic;
 
 namespace TcgEngine
 {
@@ -39,8 +37,8 @@ namespace TcgEngine
         public int selected_value;         // 玩家选择的值（比如选择器）
 
         // 其他引用集合
-        public HashSet<string> ability_played = new HashSet<string>(); // 已触发技能集合
-        public HashSet<string> cards_attacked = new HashSet<string>(); // 已攻击卡牌集合
+        public HashSet<string> ability_played = new(); // 已触发技能集合
+        public HashSet<string> cards_attacked = new(); // 已攻击卡牌集合
 
         public Game() { }
 
@@ -50,32 +48,36 @@ namespace TcgEngine
             this.game_uid = uid;
             players = new Player[nb_players];
             for (int i = 0; i < nb_players; i++)
+            {
                 players[i] = new Player(i);
+            }
             settings = GameSettings.Default;
         }
 
         // 判断是否所有玩家准备就绪
         public virtual bool AreAllPlayersReady()
         {
-            int ready = 0;
             foreach (Player player in players)
             {
-                if (player.IsReady())
-                    ready++;
+                if (!player.IsReady())
+                {
+                    return false;
+                }
             }
-            return ready >= settings.nb_players;
+            return true;
         }
 
         // 判断是否所有玩家已连接
         public virtual bool AreAllPlayersConnected()
         {
-            int ready = 0;
             foreach (Player player in players)
             {
-                if (player.IsConnected())
-                    ready++;
+                if (!player.IsConnected())
+                {
+                    return false;
+                }
             }
-            return ready >= settings.nb_players;
+            return true;
         }
 
         // 检查是否轮到玩家行动（包括常规操作和选择器）
