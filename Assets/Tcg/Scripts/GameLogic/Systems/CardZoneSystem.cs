@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace TcgEngine.Gameplay
 {
-    public class CardZoneController
+    public class CardZoneSystem
     {
         public int DrawCards(Player player, int count = 1)
         {
@@ -13,8 +13,7 @@ namespace TcgEngine.Gameplay
                 if (player.cards_deck.Count > 0 && player.cards_hand.Count < GameplayData.Get().cards_max)
                 {
                     Card card = player.cards_deck[0];
-                    player.cards_deck.RemoveAt(0);
-                    player.cards_hand.Add(card);
+                    MoveToHand(player, card);
                     ++drawn;
                 }
             }
@@ -28,8 +27,7 @@ namespace TcgEngine.Gameplay
                 if (player.cards_hand.Count > 0)
                 {
                     Card card = player.cards_hand[0];
-                    player.cards_hand.RemoveAt(0);
-                    player.cards_discard.Add(card);
+                    MoveToDiscard(player, card);
                 }
             }
         }

@@ -50,7 +50,8 @@ namespace TcgEngine.Gameplay
         public UnityAction onRefresh;                       // 刷新事件
 
         private Game game_data;                              // 游戏数据引用
-        private CardZoneController cardZoneController;
+        private CardZoneSystem cardZoneSystem;
+        private HealthSystem healthSystem;
 
         private ResolveQueue resolve_queue;                  // 处理队列
         private bool is_ai_predict = false;                 // 是否用于AI预测
@@ -67,14 +68,16 @@ namespace TcgEngine.Gameplay
         {
             resolve_queue = new ResolveQueue(null, is_ai);
             is_ai_predict = is_ai;
-            cardZoneController = new();
+            cardZoneSystem = new();
+            healthSystem = new();
         }
 
         public GameLogic(Game game)
         {
             game_data = game;
             resolve_queue = new ResolveQueue(game, false);
-            cardZoneController = new();
+            cardZoneSystem = new();
+            healthSystem = new();
         }
 
         public virtual void SetData(Game game)
@@ -427,7 +430,7 @@ namespace TcgEngine.Gameplay
             CardData icard = card.CardData;
             if (icard.IsBoardCard())
             {
-                cardZoneController.MoveToBoard(player, card, slot);
+                cardZoneSystem.MoveToBoard(player, card, slot);
                 card.exhausted = true;        // 本回合不能攻击
             }
             else if (icard.IsEquipment())
@@ -438,11 +441,11 @@ namespace TcgEngine.Gameplay
             }
             else if (icard.IsSecret())
             {
-                cardZoneController.MoveToSecret(player, card);
+                cardZoneSystem.MoveToSecret(player, card);
             }
             else
             {
-                cardZoneController.MoveToDiscard(player, card);
+                cardZoneSystem.MoveToDiscard(player, card);
                 card.slot = slot;               // 保存槽位信息
             }
 
@@ -701,14 +704,14 @@ namespace TcgEngine.Gameplay
         // 抽牌
         public virtual void DrawCards(Player player, int count = 1)
         {
-            cardZoneController.DrawCards(player, count);
+            cardZoneSystem.DrawCards(player, count);
             // TODO: 考虑改成实际抽的牌数，目前不知道这个数量是怎么使用的，暂时不改
             onCardDrawn?.Invoke(count); // 触发抽牌事件
         }
 
         public virtual void DiscardCardsFromHand(Player player, int count = 1)
         {
-            cardZoneController.DiscardCardsFromHand(player, count);
+            cardZoneSystem.DiscardCardsFromHand(player, count);
         }
 
         // 召唤一张卡牌的复制
@@ -767,7 +770,7 @@ namespace TcgEngine.Gameplay
             if (bearer == null) return;
             Player player = game_data.GetPlayer(bearer.player_id);
 
-            Card oldEquipment = cardZoneController.EquipCard(player, bearer, equipment);
+            Card oldEquipment = cardZoneSystem.EquipCard(player, bearer, equipment);
 
             if (oldEquipment != null)
             {
@@ -781,7 +784,7 @@ namespace TcgEngine.Gameplay
             if (bearer == null || bearer.equipped_uid == null) return;
             Player player = game_data.GetPlayer(bearer.player_id);
 
-            Card equipment = cardZoneController.UnequipCard(player, bearer);
+            Card equipment = cardZoneSystem.UnequipCard(player, bearer);
             if (equipment != null)
             {
                 DiscardCard(equipment); // 卸下装备并丢弃
@@ -804,15 +807,25 @@ namespace TcgEngine.Gameplay
         // 对玩家造成伤害
         public virtual void DamagePlayer(Card attacker, Player target, int value)
         {
-            target.hp -= value; // 减少玩家生命值
-            target.hp = Mathf.Clamp(target.hp, 0, target.hp_max);
+            int damaged = healthSystem.DamagePlayer(target, value);
 
             // 吸血效果
-            Player aplayer = game_data.GetPlayer(attacker.player_id);
-            if (attacker.HasStatus(StatusType.LifeSteal))
-                aplayer.hp += value;
+            // TODO: 这里吸血不用触发玩家治疗事件吗？
+            if (attacker != null && attacker.HasStatus(StatusType.LifeSteal))
+            {
+                Player aplayer = game_data.GetPlayer(attacker.player_id);
+                healthSystem.HealPlayer(aplayer, damaged);
+            }
 
-            onPlayerDamaged?.Invoke(target, value); // 触发玩家受伤事件
+            onPlayerDamaged?.Invoke(target, damaged); // 触发玩家受伤事件
+        }
+
+        // 治疗玩家
+        public virtual void HealPlayer(Player target, int value)
+        {
+            int healed = healthSystem.HealPlayer(target, value);
+
+            onPlayerHealed?.Invoke(target, healed); // 触发玩家治疗事件
         }
 
         // 治疗卡牌
@@ -828,18 +841,6 @@ namespace TcgEngine.Gameplay
             target.damage = Mathf.Max(target.damage, 0);
 
             onCardHealed?.Invoke(target, value); // 触发卡牌治疗事件
-        }
-
-        // 治疗玩家
-        public virtual void HealPlayer(Player target, int value)
-        {
-            if (target == null)
-                return;
-
-            target.hp += value;
-            target.hp = Mathf.Clamp(target.hp, 0, target.hp_max);
-
-            onPlayerHealed?.Invoke(target, value); // 触发玩家治疗事件
         }
 
         // 通用伤害（非来自其他卡牌）
@@ -950,7 +951,7 @@ namespace TcgEngine.Gameplay
             UnequipAll(card);
 
             // 从场上移除并加入弃牌堆
-            cardZoneController.MoveToDiscard(player, card);
+            cardZoneSystem.MoveToDiscard(player, card);
             game_data.last_destroyed = card.uid;
 
             // 移除持有者关联
@@ -1774,7 +1775,7 @@ namespace TcgEngine.Gameplay
                 else
                     player.mana += card.CardData.cost; // 退回固定法力消耗
 
-                cardZoneController.MoveToHand(player, card);
+                cardZoneSystem.MoveToHand(player, card);
                 card.Clear(); // 清理卡牌状态
             }
         }
@@ -1801,7 +1802,7 @@ namespace TcgEngine.Gameplay
                 // 将重选的卡牌移除并放入弃牌堆
                 foreach (Card card in remove_list)
                 {
-                    cardZoneController.MoveToDiscard(player, card);
+                    cardZoneSystem.MoveToDiscard(player, card);
                 }
 
                 player.ready = true; // 玩家标记为已准备
