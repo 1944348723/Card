@@ -423,9 +423,6 @@ namespace TcgEngine.Gameplay
             if (!skip_cost)
                 player.PayMana(card);
 
-            // 从所有区域移除该卡牌
-            player.RemoveCardFromAllGroups(card);
-
             // 放置到目标位置
             CardData icard = card.CardData;
             if (icard.IsBoardCard())
@@ -953,8 +950,7 @@ namespace TcgEngine.Gameplay
             UnequipAll(card);
 
             // 从场上移除并加入弃牌堆
-            player.RemoveCardFromAllGroups(card);
-            player.cards_discard.Add(card);
+            cardZoneController.MoveToDiscard(player, card);
             game_data.last_destroyed = card.uid;
 
             // 移除持有者关联
@@ -1778,8 +1774,7 @@ namespace TcgEngine.Gameplay
                 else
                     player.mana += card.CardData.cost; // 退回固定法力消耗
 
-                player.RemoveCardFromAllGroups(card);
-                player.AddCard(player.cards_hand, card); // 将卡牌放回手牌
+                cardZoneController.MoveToHand(player, card);
                 card.Clear(); // 清理卡牌状态
             }
         }
@@ -1806,8 +1801,7 @@ namespace TcgEngine.Gameplay
                 // 将重选的卡牌移除并放入弃牌堆
                 foreach (Card card in remove_list)
                 {
-                    player.RemoveCardFromAllGroups(card);
-                    player.cards_discard.Add(card);
+                    cardZoneController.MoveToDiscard(player, card);
                 }
 
                 player.ready = true; // 玩家标记为已准备

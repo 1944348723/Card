@@ -37,7 +37,7 @@ namespace TcgEngine.Gameplay
         // 返回原来的装备
         public Card EquipCard(Player player, Card bearer, Card equipment)
         {
-            if (bearer != null || equipment != null || bearer.player_id != equipment.player_id) return null;
+            if (player == null || bearer == null || equipment == null || bearer.player_id != equipment.player_id) return null;
             if (bearer.CardData.IsEquipment() || !equipment.CardData.IsEquipment()) return null;
 
             Card oldEquipment = UnequipCard(player, bearer);
