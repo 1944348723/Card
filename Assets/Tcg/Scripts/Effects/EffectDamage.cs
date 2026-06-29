@@ -23,7 +23,7 @@ namespace TcgEngine
             int damage = GetDamage(logic.GameData, caster, ability.value);
 
             // 执行伤害逻辑
-            logic.DamagePlayer(caster, target, damage);
+            logic.DamagePlayer(caster, target, damage, DamageType.Spell);
         }
 
         // 对卡牌造成伤害
@@ -33,7 +33,7 @@ namespace TcgEngine
             int damage = GetDamage(logic.GameData, caster, ability.value);
 
             // true 通常表示触发伤害动画/事件或可被防御系统识别
-            logic.DamageCard(caster, target, damage, true);
+            logic.DamageCard(caster, target, damage, DamageType.Spell);
         }
 
         // 计算伤害值

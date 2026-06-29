@@ -7,6 +7,14 @@ using UnityEngine.Profiling;
 
 namespace TcgEngine.Gameplay
 {
+    public enum DamageType
+    {
+        Combat,
+        Spell,
+        Status,
+        Direct
+    }
+
     /// <summary>
     /// 执行并处理游戏规则和逻辑
     /// </summary>
@@ -178,7 +186,7 @@ namespace TcgEngine.Gameplay
             player.history_list.Clear();
 
             // 中毒处理
-            player.hp -= player.GetStatusValue(StatusType.Poisoned);
+            DamagePlayer(player, player.GetStatusValue(StatusType.Poisoned), DamageType.Status);
 
             player.hero?.Refresh(); // 刷新英雄状态
 
@@ -191,7 +199,7 @@ namespace TcgEngine.Gameplay
                     card.Refresh(); // 刷新卡牌状态
 
                 if (card.HasStatus(StatusType.Poisoned))
-                    DamageCard(card, card.GetStatusValue(StatusType.Poisoned)); // 中毒伤害
+                    DamageCard(card, card.GetStatusValue(StatusType.Poisoned), DamageType.Status); // 中毒伤害
             }
 
             // 持续能力更新
@@ -557,11 +565,11 @@ namespace TcgEngine.Gameplay
             int datt2 = target.GetAttack();
 
             // 伤害卡牌
-            DamageCard(attacker, target, datt1);
+            DamageCard(attacker, target, datt1, DamageType.Combat);
 
             // 反击伤害
             if (!attacker.HasStatus(StatusType.Intimidate))
-                DamageCard(target, attacker, datt2);
+                DamageCard(target, attacker, datt2, DamageType.Combat);
 
             // 保存攻击并疲劳
             if (!skip_cost)
@@ -629,7 +637,7 @@ namespace TcgEngine.Gameplay
         // 攻击玩家命中
         protected virtual void ResolveAttackPlayerHit(Card attacker, Player target, bool skip_cost)
         {
-            DamagePlayer(attacker, target, attacker.GetAttack()); // 对玩家造成伤害
+            DamagePlayer(attacker, target, attacker.GetAttack(), DamageType.Combat); // 对玩家造成伤害
 
             // 保存攻击并疲劳
             if (!skip_cost)
@@ -804,118 +812,112 @@ namespace TcgEngine.Gameplay
             }
         }
 
-        // 对玩家造成伤害
-        public virtual void DamagePlayer(Card attacker, Player target, int value)
+        public virtual void DamagePlayer(Card attacker, Player target, int value, DamageType damageType)
         {
-            int damaged = healthSystem.DamagePlayer(target, value);
+            if (attacker == null || target == null || value <= 0) return;
+            DamageResult result = healthSystem.DamagePlayer(target, value);
+            if (!result.resolved) return;
 
             // 吸血效果
-            // TODO: 这里吸血不用触发玩家治疗事件吗？
-            if (attacker != null && attacker.HasStatus(StatusType.LifeSteal))
+            if (damageType == DamageType.Combat && attacker.HasStatus(StatusType.LifeSteal))
             {
                 Player aplayer = game_data.GetPlayer(attacker.player_id);
-                healthSystem.HealPlayer(aplayer, damaged);
+                HealPlayer(aplayer, result.effectiveDamage);
             }
 
-            onPlayerDamaged?.Invoke(target, damaged); // 触发玩家受伤事件
+            onPlayerDamaged?.Invoke(target, result.finalDamage); // 触发玩家受伤事件
         }
 
-        // 治疗玩家
+        public virtual void DamagePlayer(Player target, int value, DamageType damageType)
+        {
+            if (target == null || value <= 0) return;
+            DamageResult result = healthSystem.DamagePlayer(target, value);
+            if (!result.resolved) return;
+
+            onPlayerDamaged?.Invoke(target, result.finalDamage); // 触发玩家受伤事件
+        }
+
         public virtual void HealPlayer(Player target, int value)
         {
-            int healed = healthSystem.HealPlayer(target, value);
+            HealResult result = healthSystem.HealPlayer(target, value);
+            if (!result.resolved) return;
 
-            onPlayerHealed?.Invoke(target, healed); // 触发玩家治疗事件
+            onPlayerHealed?.Invoke(target, result.finalValue); // 触发玩家治疗事件
         }
 
-        // 治疗卡牌
         public virtual void HealCard(Card target, int value)
         {
-            if (target == null)
-                return;
+            HealResult result = healthSystem.HealCard(target, value);
+            if (!result.resolved) return;
 
-            if (target.HasStatus(StatusType.Invincibility))
-                return; // 无敌状态无法治疗
-
-            target.damage -= value; // 减少伤害值
-            target.damage = Mathf.Max(target.damage, 0);
-
-            onCardHealed?.Invoke(target, value); // 触发卡牌治疗事件
+            onCardHealed?.Invoke(target, result.finalValue); // 触发卡牌治疗事件
         }
 
-        // 通用伤害（非来自其他卡牌）
-        public virtual void DamageCard(Card target, int value)
+        public virtual void DamageCard(Card attacker, Card target, int value, DamageType damageType)
         {
-            if (target == null)
-                return;
-
-            if (target.HasStatus(StatusType.Invincibility))
-                return; // 无敌状态
-
-            // TODO: 通用伤害怎么定义，包含哪些，一定算法术吗？目前来看似乎只有中毒伤害
-            if (target.HasStatus(StatusType.SpellImmunity))
-                return; // 法术免疫
-
-            target.damage += value;
-
-            onCardDamaged?.Invoke(target, value); // 触发卡牌受伤事件
-
-            if (target.GetHP() <= 0)
-                DiscardCard(target); // 卡牌生命值归零则丢弃
-        }
-
-        // 由攻击者/施法者对卡牌造成伤害
-        public virtual void DamageCard(Card attacker, Card target, int value, bool spell_damage = false)
-        {
-            if (attacker == null || target == null)
-                return;
-
-            if (target.HasStatus(StatusType.Invincibility))
-                return; // 无敌状态
-
-            if (target.HasStatus(StatusType.SpellImmunity) && attacker.CardData.type != CardType.Character)
-                return; // 非角色卡牌免疫法术
-
-            // 反弹护盾
-            bool doublelife = target.HasStatus(StatusType.Shell);
-            if (doublelife && value > 0)
+            if (attacker == null || target == null || value <= 0) return;
+            DamageResult result = healthSystem.DamageCard(target, value, damageType);
+            if (!result.resolved) return;
+            
+            bool isCombat = damageType == DamageType.Combat;
+            if (result.finalDamage > 0)
             {
-                target.RemoveStatus(StatusType.Shell);
-                return;
+                // 造成伤害后移除沉睡状态
+                if (damageType != DamageType.Status)
+                {
+                    target.RemoveStatus(StatusType.Sleep);
+                }
+
+                // 踩踏效果
+                Player tplayer = game_data.GetPlayer(target.player_id);
+                if (isCombat && result.excessDamage > 0 && attacker.HasStatus(StatusType.Trample))
+                {
+                    DamagePlayer(attacker, tplayer, result.excessDamage, DamageType.Combat);
+                }
+
+                // 吸血效果
+                if (isCombat && attacker.HasStatus(StatusType.LifeSteal))
+                {
+                    Player player = game_data.GetPlayer(attacker.player_id);
+                    HealPlayer(player, result.effectiveDamage);
+                }
             }
 
-            // 护甲减伤
-            if (!spell_damage && target.HasStatus(StatusType.Armor))
-                value = Mathf.Max(value - target.GetStatusValue(StatusType.Armor), 0);
+            // 触发回调
+            onCardDamaged?.Invoke(target, result.finalDamage);
 
-            // 伤害
-            int damage_max = Mathf.Min(value, target.GetHP());
-            int extra = value - target.GetHP();
-            target.damage += value;
-
-            // 踩踏效果
-            Player tplayer = game_data.GetPlayer(target.player_id);
-            if (!spell_damage && extra > 0 && attacker.player_id == game_data.current_player && attacker.HasStatus(StatusType.Trample))
-                tplayer.hp -= extra;
-
-            // 吸血效果
-            Player player = game_data.GetPlayer(attacker.player_id);
-            if (!spell_damage && attacker.HasStatus(StatusType.LifeSteal))
-                player.hp += damage_max;
-
+            if (target.GetHP() <= 0)
+            {
+                KillCard(attacker, target);
+            }   // 死亡之触
+            else if (result.effectiveDamage > 0
+                && isCombat
+                && attacker.HasStatus(StatusType.Deathtouch)
+                && target.CardData.type == CardType.Character)
+            {
+                KillCard(attacker, target);
+            }
+        }
+        
+        public virtual void DamageCard(Card target, int value, DamageType damageType)
+        {
+            if (target == null || value <= 0) return;
+            DamageResult result = healthSystem.DamageCard(target, value, damageType);
+            if (!result.resolved) return;
+            
             // 造成伤害后移除沉睡状态
-            target.RemoveStatus(StatusType.Sleep);
+            if (result.finalDamage > 0 && damageType != DamageType.Status)
+            {
+                target.RemoveStatus(StatusType.Sleep);
+            }
 
             // 触发回调
-            onCardDamaged?.Invoke(target, value);
+            onCardDamaged?.Invoke(target, result.finalDamage);
 
-            // 死亡之触
-            if (value > 0 && attacker.HasStatus(StatusType.Deathtouch) && target.CardData.type == CardType.Character)
-                KillCard(attacker, target);
-
-            // 生命值为0则击杀卡牌
             if (target.GetHP() <= 0)
-                KillCard(attacker, target);
+            {
+                DiscardCard(target);
+            }
         }
 
         // 一张卡牌击杀另一张卡牌
