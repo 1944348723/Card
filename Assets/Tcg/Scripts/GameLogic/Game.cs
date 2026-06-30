@@ -122,11 +122,7 @@ namespace TcgEngine
             // 根据卡牌类型判断槽位是否合法
             if (card.CardData.IsBoardCard())
             {
-                if (!slot.IsBoardSlot() || HasCardOnSlot(slot)) return false;
-                // 不能打到地方槽位
-                if (!slot.BelongsToPlayer(card.player_id))  return false;
-
-                return true;
+                return slot.IsBoardSlot() && !HasCardOnSlot(slot) && slot.BelongsToPlayer(card.player_id);
             }
             if (card.CardData.IsEquipment())
             {
@@ -140,7 +136,7 @@ namespace TcgEngine
             }
             if (card.CardData.IsRequireTargetSpell())
             {
-                return IsPlayTargetValid(card, slot); // 需要目标的法术
+                return IsPlayTargetValid(card, slot);
             }
             if (card.CardData.type == CardType.Spell)
             {

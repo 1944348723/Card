@@ -89,7 +89,10 @@ namespace TcgEngine.Gameplay
 
         private void MoveToPile(Player player, Card card, List<Card> pile)
         {
-            Debug.Assert(IsInMoreThanOneZone(player, card), $"Card zone stats invalid: {card.uid}");
+            if (player == null || card == null || pile == null) return;
+
+            Debug.Assert(!IsInMoreThanOneZone(player, card), $"Card zone stats invalid: {card.uid}");
+
             player.RemoveCardFromAllGroups(card);
             pile.Add(card);
         }
