@@ -707,16 +707,9 @@ namespace TcgEngine.Gameplay
         // 洗牌
         public virtual void ShuffleDeck(List<Card> cards)
         {
-            for (int i = 0; i < cards.Count; i++)
-            {
-                Card temp = cards[i];
-                int randomIndex = random.Next(i, cards.Count);
-                cards[i] = cards[randomIndex];
-                cards[randomIndex] = temp;
-            }
+            cardSystem.ShuffleDeck(cards, random);
         }
 
-        // 抽牌
         public virtual void DrawCards(Player player, int count = 1)
         {
             int drawn = cardSystem.DrawCards(player, count);
@@ -728,28 +721,10 @@ namespace TcgEngine.Gameplay
             cardSystem.DiscardCardsFromHand(player, count);
         }
 
-        // 召唤一张卡牌的复制
-        public virtual Card SummonCopy(Player player, Card copy, Slot slot)
-        {
-            CardData icard = copy.CardData;
-            return SummonCard(player, icard, copy.VariantData, slot);
-        }
-
-        // 召唤一张卡牌的复制到手牌
-        public virtual Card SummonCopyHand(Player player, Card copy)
-        {
-            CardData icard = copy.CardData;
-            return SummonCardHand(player, icard, copy.VariantData);
-        }
-
         // 召唤一张新卡牌到场上
         public virtual Card SummonCard(Player player, CardData card, VariantData variant, Slot slot)
         {
-            if (!slot.IsBoardSlot())
-                return null;
-
-            if (game_data.GetSlotCard(slot) != null)
-                return null;
+            if (!slot.IsBoardSlot() || game_data.HasCardOnSlot(slot))    return null;
 
             Card acard = SummonCardHand(player, card, variant);
             PlayCard(acard, slot, true); // 放置到场上，不消耗费用
@@ -758,7 +733,6 @@ namespace TcgEngine.Gameplay
 
             return acard;
         }
-
 
         // 创建一张新卡牌并放入手牌
         public virtual Card SummonCardHand(Player player, CardData card, VariantData variant)
