@@ -58,7 +58,8 @@ namespace TcgEngine.Gameplay
         public UnityAction onRefresh;                       // 刷新事件
 
         private Game game_data;                              // 游戏数据引用
-        private CardZoneSystem cardZoneSystem;
+        private CardZoneService cardZoneService;
+        private CardSystem cardSystem;
         private HealthSystem healthSystem;
 
         private ResolveQueue resolve_queue;                  // 处理队列
@@ -76,7 +77,9 @@ namespace TcgEngine.Gameplay
         {
             resolve_queue = new ResolveQueue(null, is_ai);
             is_ai_predict = is_ai;
-            cardZoneSystem = new();
+
+            cardZoneService = new();
+            cardSystem = new(game_data, cardZoneService);
             healthSystem = new();
         }
 
@@ -84,7 +87,9 @@ namespace TcgEngine.Gameplay
         {
             game_data = game;
             resolve_queue = new ResolveQueue(game, false);
-            cardZoneSystem = new();
+
+            cardZoneService = new();
+            cardSystem = new(game_data, cardZoneService);
             healthSystem = new();
         }
 
@@ -92,6 +97,8 @@ namespace TcgEngine.Gameplay
         {
             game_data = game;
             resolve_queue.SetData(game);
+
+            cardSystem.SetData(game);
         }
 
         public virtual void Update(float delta)
@@ -438,7 +445,7 @@ namespace TcgEngine.Gameplay
             CardData icard = card.CardData;
             if (icard.IsBoardCard())
             {
-                cardZoneSystem.MoveToBoard(player, card, slot);
+                cardZoneService.MoveToBoard(player, card, slot);
                 card.exhausted = true;        // 本回合不能攻击
             }
             else if (icard.IsEquipment())
@@ -449,11 +456,11 @@ namespace TcgEngine.Gameplay
             }
             else if (icard.IsSecret())
             {
-                cardZoneSystem.MoveToSecret(player, card);
+                cardZoneService.MoveTo(player, card, CardZone.Secret);
             }
             else
             {
-                cardZoneSystem.MoveToDiscard(player, card);
+                cardZoneService.MoveTo(player, card, CardZone.Discard);
                 card.slot = slot;               // 保存槽位信息
             }
 
@@ -712,14 +719,13 @@ namespace TcgEngine.Gameplay
         // 抽牌
         public virtual void DrawCards(Player player, int count = 1)
         {
-            cardZoneSystem.DrawCards(player, count);
-            // TODO: 考虑改成实际抽的牌数，目前不知道这个数量是怎么使用的，暂时不改
-            onCardDrawn?.Invoke(count); // 触发抽牌事件
+            int drawn = cardSystem.DrawCards(player, count);
+            onCardDrawn?.Invoke(drawn);
         }
 
         public virtual void DiscardCardsFromHand(Player player, int count = 1)
         {
-            cardZoneSystem.DiscardCardsFromHand(player, count);
+            cardSystem.DiscardCardsFromHand(player, count);
         }
 
         // 召唤一张卡牌的复制
@@ -757,10 +763,7 @@ namespace TcgEngine.Gameplay
         // 创建一张新卡牌并放入手牌
         public virtual Card SummonCardHand(Player player, CardData card, VariantData variant)
         {
-            Card acard = Card.Create(card, variant, player);
-            player.cards_hand.Add(acard);
-            game_data.last_summoned = acard.uid; // 记录最后召唤的卡牌
-            return acard;
+            return cardSystem.CreateInHand(player, card, variant);
         }
 
         // 将卡牌变形为另一张卡牌
@@ -775,10 +778,7 @@ namespace TcgEngine.Gameplay
 
         public virtual void EquipCard(Card bearer, Card equipment)
         {
-            if (bearer == null) return;
-            Player player = game_data.GetPlayer(bearer.player_id);
-
-            Card oldEquipment = cardZoneSystem.EquipCard(player, bearer, equipment);
+            Card oldEquipment = cardSystem.Equip(bearer, equipment);
 
             if (oldEquipment != null)
             {
@@ -789,10 +789,7 @@ namespace TcgEngine.Gameplay
         // 卸下卡牌上的所有装备
         public virtual void UnequipAll(Card bearer)
         {
-            if (bearer == null || bearer.equipped_uid == null) return;
-            Player player = game_data.GetPlayer(bearer.player_id);
-
-            Card equipment = cardZoneSystem.UnequipCard(player, bearer);
+            Card equipment = cardSystem.Unequip(bearer);
             if (equipment != null)
             {
                 DiscardCard(equipment); // 卸下装备并丢弃
@@ -802,14 +799,7 @@ namespace TcgEngine.Gameplay
         // 改变卡牌所有者
         public virtual void ChangeOwner(Card card, Player owner)
         {
-            if (card.player_id != owner.player_id)
-            {
-                Player powner = game_data.GetPlayer(card.player_id);
-                powner.RemoveCardFromAllGroups(card);
-                powner.cards_all.Remove(card.uid);
-                owner.cards_all[card.uid] = card;
-                card.player_id = owner.player_id; // 更新卡牌所属玩家
-            }
+            cardSystem.ChangeOwner(card, owner);
         }
 
         public virtual void DamagePlayer(Card attacker, Player target, int value, DamageType damageType)
@@ -953,7 +943,7 @@ namespace TcgEngine.Gameplay
             UnequipAll(card);
 
             // 从场上移除并加入弃牌堆
-            cardZoneSystem.MoveToDiscard(player, card);
+            cardZoneService.MoveTo(player, card, CardZone.Discard);
             game_data.last_destroyed = card.uid;
 
             // 移除持有者关联
@@ -1777,7 +1767,7 @@ namespace TcgEngine.Gameplay
                 else
                     player.mana += card.CardData.cost; // 退回固定法力消耗
 
-                cardZoneSystem.MoveToHand(player, card);
+                cardZoneService.MoveTo(player, card, CardZone.Hand);
                 card.Clear(); // 清理卡牌状态
             }
         }
@@ -1804,7 +1794,7 @@ namespace TcgEngine.Gameplay
                 // 将重选的卡牌移除并放入弃牌堆
                 foreach (Card card in remove_list)
                 {
-                    cardZoneSystem.MoveToDiscard(player, card);
+                    cardZoneService.MoveTo(player, card, CardZone.Discard);
                 }
 
                 player.ready = true; // 玩家标记为已准备
