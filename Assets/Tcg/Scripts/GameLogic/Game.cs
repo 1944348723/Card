@@ -109,36 +109,34 @@ namespace TcgEngine
         // 检查玩家是否可以打出卡牌到指定槽位
         public virtual bool CanPlayCard(Card card, Slot slot, bool skip_cost = false)
         {
-            if (card == null)
-                return false;
+            if (card == null) return false;
 
             Player player = GetPlayer(card.player_id);
-            if (!skip_cost && !player.CanPayMana(card))
-                return false; // 法力不足
-            if (!player.HasCard(player.cards_hand, card))
-                return false; // 卡牌不在手牌中
-            if (player.is_ai && card.CardData.IsDynamicManaCost() && player.mana == 0)
-                return false; // AI不能在0法力打X-cost卡
+
+            if (!player.HasCardInHand(card))    return false;
+            // 法力不足
+            if (!skip_cost && !player.CanPayMana(card)) return false;
+            // AI不能在0法力打X-cost卡
+            if (player.is_ai && card.CardData.IsDynamicManaCost() && player.mana == 0)  return false; 
 
             // 根据卡牌类型判断槽位是否合法
             if (card.CardData.IsBoardCard())
             {
-                if (!slot.IsValid() || IsCardOnSlot(slot))
-                    return false;   // 槽已被占用
-                if (Slot.GetP(card.player_id) != slot.p)
-                    return false; // 不能打到敌方槽位
+                if (!slot.IsBoardSlot() || HasCardOnSlot(slot)) return false;
+                // 不能打到地方槽位
+                if (!slot.BelongsToPlayer(card.player_id))  return false;
+
                 return true;
             }
             if (card.CardData.IsEquipment())
             {
-                if (!slot.IsValid())
-                    return false;
+                if (!slot.IsBoardSlot())     return false;
 
                 Card target = GetSlotCard(slot);
-                if (target == null || target.CardData.type != CardType.Character || target.player_id != card.player_id)
-                    return false; // 装备目标必须是己方角色
-
-                return true;
+                bool isSameTeamCharacter = target != null
+                                        && target.CardData.type == CardType.Character
+                                        && target.player_id == card.player_id;
+                return isSameTeamCharacter;
             }
             if (card.CardData.IsRequireTargetSpell())
             {
@@ -154,7 +152,7 @@ namespace TcgEngine
         // 检查卡牌是否允许移动到指定槽位
         public virtual bool CanMoveCard(Card card, Slot slot, bool skip_cost = false)
         {
-            if (card == null || !slot.IsValid())
+            if (card == null || !slot.IsBoardSlot())
                 return false;
 
             if (!IsOnBoard(card))
@@ -163,7 +161,7 @@ namespace TcgEngine
             if (!card.CanMove(skip_cost))
                 return false; // 卡牌不能移动
 
-            if (Slot.GetP(card.player_id) != slot.p)
+            if (!slot.BelongsToPlayer(card.player_id))
                 return false; // 不能移动到敌方槽位
 
             if (card.slot == slot)
@@ -545,7 +543,7 @@ namespace TcgEngine
         }
 
         // 判断槽位上是否有卡牌
-        public bool IsCardOnSlot(Slot slot)
+        public bool HasCardOnSlot(Slot slot)
         {
             return GetSlotCard(slot) != null;
         }

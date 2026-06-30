@@ -379,7 +379,7 @@ namespace TcgEngine.Gameplay
                 foreach (DeckCardSlot card in puzzle.board_cards)
                 {
                     Card acard = Card.Create(card.card, variant, player); // 创建场上卡牌
-                    acard.slot = new Slot(card.slot, Slot.GetP(player.player_id)); // 设置卡牌槽位
+                    acard.slot = new Slot(card.slot, player.player_id); // 设置卡牌槽位
                     player.cards_board.Add(acard); // 添加到场上
                 }
             }
@@ -739,7 +739,7 @@ namespace TcgEngine.Gameplay
         // 召唤一张新卡牌到场上
         public virtual Card SummonCard(Player player, CardData card, VariantData variant, Slot slot)
         {
-            if (!slot.IsValid())
+            if (!slot.IsBoardSlot())
                 return null;
 
             if (game_data.GetSlotCard(slot) != null)
@@ -1678,7 +1678,7 @@ namespace TcgEngine.Gameplay
             Card caster = game_data.GetCard(game_data.selector_caster_uid);
             AbilityData ability = AbilityData.Get(game_data.selector_ability_id);
 
-            if (caster == null || ability == null || !target.IsValid())
+            if (caster == null || ability == null || !target.IsBoardSlot())
                 return;
 
             if (game_data.selector == SelectorType.SelectTarget)

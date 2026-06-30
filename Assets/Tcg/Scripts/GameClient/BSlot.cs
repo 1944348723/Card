@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -109,12 +108,11 @@ namespace TcgEngine.Client
 
         /// <summary>
         /// 槽是否代表一个“玩家槽”（即玩家本体区域）
-        /// 默认规则：x = 0 且 y = 0 表示玩家槽
         /// </summary>
         public virtual bool IsPlayer()
         {
             Slot slot = GetSlot();
-            return slot.x == 0 && slot.y == 0;
+            return slot.IsPlayerSlot();
         }
 
         /// <summary>

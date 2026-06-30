@@ -48,7 +48,7 @@ namespace TcgEngine
             if (!IsAIPlayer(data, caster))
                 return true; // 对人类玩家始终返回 true
 
-            bool same_owner = Slot.GetP(caster.player_id) == target.p;
+            bool same_owner = target.BelongsToPlayer(caster.player_id);
             return CompareBool(same_owner, oper);
         }
 

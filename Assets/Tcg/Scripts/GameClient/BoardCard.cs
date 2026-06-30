@@ -269,7 +269,7 @@ namespace TcgEngine.Client
                 });
 
                 GameBoard board = GameBoard.Get();
-                if (player.HasCard(player.cards_hand, card) || player.HasCard(player.cards_deck, card))
+                if (player.HasCardInHand(card) || player.HasCardInDeck(card))
                 {
                     back_to_hand = true;
                     back_to_hand_target = player.player_id == GameClient.Get().GetPlayerID() ? -board.transform.up : board.transform.up;

@@ -404,7 +404,7 @@ namespace TcgEngine.Server
             if (player != null && game_data.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
             {
                 // slot 校验有效性
-                if(slot != null && slot.IsValid())
+                if(slot != null && slot.IsBoardSlot())
                     gameplay.SelectSlot(slot);
             }
         }

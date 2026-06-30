@@ -71,18 +71,6 @@ namespace TcgEngine
 
         //---- 卡牌操作 -----
 
-        // 添加卡牌到指定列表
-        public void AddCard(List<Card> card_list, Card card)
-        {
-            card_list.Add(card);
-        }
-
-        // 从列表移除卡牌
-        public void RemoveCard(List<Card> card_list, Card card)
-        {
-            card_list.Remove(card);
-        }
-
         // 从所有卡组中移除卡牌
         public virtual void RemoveCardFromAllGroups(Card card)
         {
@@ -114,10 +102,14 @@ namespace TcgEngine
             return null;
         }
 
-        // 判断列表中是否包含指定卡牌
-        public bool HasCard(List<Card> card_list, Card card)
+        public bool HasCardInHand(Card card)
         {
-            return card_list.Contains(card);
+            return cards_hand.Contains(card);
+        }
+
+        public bool HasCardInDeck(Card card)
+        {
+            return cards_deck.Contains(card);
         }
 
         // 根据UID获取手牌
