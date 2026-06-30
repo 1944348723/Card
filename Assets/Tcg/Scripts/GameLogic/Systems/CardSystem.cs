@@ -21,7 +21,7 @@ namespace TcgEngine.Gameplay
         public void ShuffleDeck(List<Card> cards, System.Random random)
         {
             if (cards == null || random == null) return;
-            
+
             for (int i = 0; i < cards.Count; i++)
             {
                 int randomIndex = random.Next(i, cards.Count);
@@ -91,9 +91,9 @@ namespace TcgEngine.Gameplay
 
             // TODO: 卸下装备后这里没有立刻将卡移出装备区，是因为目前逻辑得这样做，外部在DiscardCard中该卡因为其属于装备区可能还要触发什么东西
             // 但是这样感觉Unequip本身并不独立，强依赖于和DiscardCard联用，只调用Unequip的话调用后游戏状态是错误的
-            bearer.equipped_uid = null;
             Player player = game.GetPlayer(bearer.player_id);
             Card equipment = player.GetEquipCard(bearer.equipped_uid);
+            bearer.equipped_uid = null;
 
             return equipment;
         }
