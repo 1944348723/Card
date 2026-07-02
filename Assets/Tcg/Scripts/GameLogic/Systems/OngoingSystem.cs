@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine.Profiling;
 
 namespace TcgEngine.Gameplay
@@ -17,53 +16,13 @@ namespace TcgEngine.Gameplay
             this.game = game;
         }
 
-        // 该函数经常被调用，用于更新受持续能力影响的状态/属性
-        // 基本逻辑是先将加成清零（CleanOngoing），再重新计算以确保持续效果存在
-        public void Update(GameLogic logic, List<Card> cardsToClear)
-        {
-            Profiler.BeginSample("Update Ongoing");
-            UpdateOngoings(logic);
-            UpdateKills(logic, cardsToClear);
-            Profiler.EndSample();
-        }
-
         public void UpdateOngoings(GameLogic logic)
         {
+            Profiler.BeginSample("Update Ongoing");
             ClearOngoings();
             ApplyOngoingAbilities(logic);
             ApplyDerivedStatusEffects();
-        }
-
-        // 杀掉HP为0的卡牌
-        public void UpdateKills(GameLogic logic, List<Card> cardsToClear)
-        {
-            foreach (Player player in game.players)
-            {
-                for (int i = player.cards_board.Count - 1; i >= 0; i--)
-                {
-                    if (i < player.cards_board.Count && player.cards_board[i].GetHP() <= 0)
-                    {
-                        logic.DiscardCard(player.cards_board[i]);
-                    }
-                }
-
-                for (int i = player.cards_equip.Count - 1; i >= 0; i--)
-                {
-                    if (i >= player.cards_equip.Count) continue;
-
-                    Card card = player.cards_equip[i];
-                    if (card.GetHP() <= 0 || player.GetBearerCard(card) == null)
-                    {
-                        logic.DiscardCard(card);
-                    }
-                }
-            }
-
-            foreach (Card card in cardsToClear)
-            {
-                card.Clear();
-            }
-            cardsToClear.Clear();
+            Profiler.EndSample();
         }
 
         // 清空场上所有临时效果，如特性、状态、能力、属性
@@ -258,7 +217,7 @@ namespace TcgEngine.Gameplay
                     // 装备卡牌
                     if (ability.target == AbilityTarget.AllCardsAllPiles)
                     {
-                        foreach (Card targetCard in player.cards_equip)
+                        foreach (Card targetCard in targetPlayer.cards_equip)
                         {
                             if (ability.AreTargetConditionsMet(game, card, targetCard))
                             {

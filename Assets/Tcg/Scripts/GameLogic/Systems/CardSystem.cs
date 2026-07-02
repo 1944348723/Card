@@ -109,5 +109,38 @@ namespace TcgEngine.Gameplay
             owner.cards_all[card.uid] = card;
             card.player_id = owner.player_id;
         }
+        
+        // 杀掉HP为0的卡牌
+        public void CleanupInvalidCards(GameLogic logic, List<Card> cardsToClear)
+        {
+            foreach (Player player in game.players)
+            {
+                for (int i = player.cards_board.Count - 1; i >= 0; i--)
+                {
+                    if (i < player.cards_board.Count && player.cards_board[i].GetHP() <= 0)
+                    {
+                        logic.DiscardCard(player.cards_board[i]);
+                    }
+                }
+
+                // 上面清除场上卡牌后，可能剩下装备，也需要清理
+                for (int i = player.cards_equip.Count - 1; i >= 0; i--)
+                {
+                    if (i >= player.cards_equip.Count) continue;
+
+                    Card card = player.cards_equip[i];
+                    if (card.GetHP() <= 0 || player.GetBearerCard(card) == null)
+                    {
+                        logic.DiscardCard(card);
+                    }
+                }
+            }
+
+            foreach (Card card in cardsToClear)
+            {
+                card.Clear();
+            }
+            cardsToClear.Clear();
+        }
     }
 }

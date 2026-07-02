@@ -214,7 +214,7 @@ namespace TcgEngine.Gameplay
             }
 
             // 持续能力更新
-            UpdateOngoing();
+            UpdateOngoings();
 
             // 回合开始触发的能力
             TriggerPlayerCardsAbilityType(player, AbilityTrigger.StartOfTurn);
@@ -474,7 +474,7 @@ namespace TcgEngine.Gameplay
 
             // 更新持续效果
             game_data.last_played = card.uid;
-            UpdateOngoing();
+            UpdateOngoings();
 
             // 触发能力
             if (card.CardData.IsDynamicManaCost())
@@ -507,7 +507,7 @@ namespace TcgEngine.Gameplay
                 if (equip != null)
                     equip.slot = slot;
 
-                UpdateOngoing();               // 更新持续效果
+                UpdateOngoings();               // 更新持续效果
                 RefreshData();                 // 刷新状态
 
                 onCardMoved?.Invoke(card, slot); // 触发移动事件
@@ -562,7 +562,7 @@ namespace TcgEngine.Gameplay
             onAttackStart?.Invoke(attacker, target); // 触发攻击开始事件
 
             attacker.RemoveStatus(StatusType.Stealth); // 移除潜行状态
-            UpdateOngoing();                           // 更新持续效果
+            UpdateOngoings();                           // 更新持续效果
 
             resolve_queue.AddAttack(attacker, target, ResolveAttackHit, skip_cost); // 添加伤害解析
             resolve_queue.ResolveAll(0.3f);
@@ -587,7 +587,7 @@ namespace TcgEngine.Gameplay
                 ExhaustBattle(attacker);
 
             // 更新加成
-            UpdateOngoing();
+            UpdateOngoings();
 
             // 触发攻击后的能力
             bool att_board = game_data.IsOnBoard(attacker);
@@ -639,7 +639,7 @@ namespace TcgEngine.Gameplay
             onAttackPlayerStart?.Invoke(attacker, target); // 触发攻击玩家开始事件
 
             attacker.RemoveStatus(StatusType.Stealth); // 移除潜行状态
-            UpdateOngoing();                           // 更新持续效果
+            UpdateOngoings();                           // 更新持续效果
 
             resolve_queue.AddAttack(attacker, target, ResolveAttackPlayerHit, skip_cost); // 添加伤害解析
             resolve_queue.ResolveAll(0.3f);
@@ -655,7 +655,7 @@ namespace TcgEngine.Gameplay
                 ExhaustBattle(attacker);
 
             // 更新加成
-            UpdateOngoing();
+            UpdateOngoings();
 
             if (game_data.IsOnBoard(attacker))
                 TriggerCardAbilityType(AbilityTrigger.OnAfterAttack, attacker, target);
@@ -935,7 +935,7 @@ namespace TcgEngine.Gameplay
                 TriggerCardAbilityType(AbilityTrigger.OnDeath, card);
                 TriggerOtherCardsAbilityType(AbilityTrigger.OnDeathOther, card);
                 TriggerSecrets(AbilityTrigger.OnDeathOther, card);
-                UpdateOngoingCards(); // 避免在 UpdateOngoingKills 中递归调用
+                ongoingSystem.UpdateOngoings(this);
             }
 
             cards_to_clear.Add(card); // 在下次 UpdateOngoing 中清理，以处理同时伤害效果
@@ -1222,7 +1222,7 @@ namespace TcgEngine.Gameplay
             }
 
             // 重新计算状态并清理
-            UpdateOngoing();
+            UpdateOngoings();
             CheckForWinner();
 
             // 链式能力触发
@@ -1241,15 +1241,13 @@ namespace TcgEngine.Gameplay
             resolve_queue.ResolveAll(0.5f);         // 解析队列
             RefreshData();                           // 刷新数据
         }
-
-        public virtual void UpdateOngoing()
-        {
-            ongoingSystem.Update(this, cards_to_clear);
-        }
-
-        protected virtual void UpdateOngoingCards()
+        
+        // 该函数经常被调用，用于更新受持续能力影响的状态/属性
+        // 基本逻辑是先将加成清零（CleanOngoing），再重新计算以确保持续效果存在
+        public virtual void UpdateOngoings()
         {
             ongoingSystem.UpdateOngoings(this);
+            cardSystem.CleanupInvalidCards(this, cards_to_clear);
         }
 
        //---- 秘密卡相关 ------------
