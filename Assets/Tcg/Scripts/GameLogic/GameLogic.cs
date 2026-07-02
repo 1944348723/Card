@@ -61,6 +61,7 @@ namespace TcgEngine.Gameplay
         private CardZoneService cardZoneService;
         private CardSystem cardSystem;
         private HealthSystem healthSystem;
+        private OngoingSystem ongoingSystem;
 
         private ResolveQueue resolve_queue;                  // 处理队列
         private bool is_ai_predict = false;                 // 是否用于AI预测
@@ -79,8 +80,9 @@ namespace TcgEngine.Gameplay
             is_ai_predict = is_ai;
 
             cardZoneService = new();
-            cardSystem = new(game_data, cardZoneService);
             healthSystem = new();
+            cardSystem = new(game_data, cardZoneService);
+            ongoingSystem = new(game_data);
         }
 
         public GameLogic(Game game)
@@ -89,8 +91,9 @@ namespace TcgEngine.Gameplay
             resolve_queue = new ResolveQueue(game, false);
 
             cardZoneService = new();
-            cardSystem = new(game_data, cardZoneService);
             healthSystem = new();
+            cardSystem = new(game_data, cardZoneService);
+            ongoingSystem = new(game_data);
         }
 
         public virtual void SetData(Game game)
@@ -99,6 +102,7 @@ namespace TcgEngine.Gameplay
             resolve_queue.SetData(game);
 
             cardSystem.SetData(game);
+            ongoingSystem.SetData(game);
         }
 
         public virtual void Update(float delta)
@@ -1238,253 +1242,15 @@ namespace TcgEngine.Gameplay
             RefreshData();                           // 刷新数据
         }
 
-        // 该函数经常被调用，用于更新受持续能力影响的状态/属性
-        // 基本逻辑是先将加成清零（CleanOngoing），再重新计算以确保持续效果存在
-        // 仅更新手牌和场上卡牌
         public virtual void UpdateOngoing()
         {
-            Profiler.BeginSample("Update Ongoing");
-            UpdateOngoingCards(); // 更新卡牌状态和属性
-            UpdateOngoingKills(); // 杀掉HP为0的卡牌
-            Profiler.EndSample();
+            ongoingSystem.Update(this, cards_to_clear);
         }
 
         protected virtual void UpdateOngoingCards()
         {
-            for (int p = 0; p < game_data.players.Length; p++)
-            {
-                Player player = game_data.players[p];
-                player.ClearOngoing(); // 清理玩家持续状态
-
-                for (int c = 0; c < player.cards_board.Count; c++)
-                    player.cards_board[c].ClearOngoing(); // 清理场上卡牌状态
-
-                for (int c = 0; c < player.cards_equip.Count; c++)
-                    player.cards_equip[c].ClearOngoing(); // 清理装备卡状态
-
-                for (int c = 0; c < player.cards_hand.Count; c++)
-                    player.cards_hand[c].ClearOngoing(); // 清理手牌状态
-            }
-
-            for (int p = 0; p < game_data.players.Length; p++)
-            {
-                Player player = game_data.players[p];
-                UpdateOngoingAbilities(player, player.hero);  // 更新英雄持续能力
-
-                for (int c = 0; c < player.cards_board.Count; c++)
-                {
-                    Card card = player.cards_board[c];
-                    UpdateOngoingAbilities(player, card); // 更新场上卡牌持续能力
-                }
-
-                for (int c = 0; c < player.cards_equip.Count; c++)
-                {
-                    Card card = player.cards_equip[c];
-                    UpdateOngoingAbilities(player, card); // 更新装备卡持续能力
-                }
-            }
-
-            // 属性加成处理
-            for (int p = 0; p < game_data.players.Length; p++)
-            {
-                Player player = game_data.players[p];
-                for (int c = 0; c < player.cards_board.Count; c++)
-                {
-                    Card card = player.cards_board[c];
-
-                    // 嘲讽效果
-                    if (card.HasStatus(StatusType.Protection) && !card.HasStatus(StatusType.Stealth))
-                    {
-                        player.AddOngoingStatus(StatusType.Protected, 0); // 玩家获得保护状态
-
-                        for (int tc = 0; tc < player.cards_board.Count; tc++)
-                        {
-                            Card tcard = player.cards_board[tc];
-                            if (!tcard.HasStatus(StatusType.Protection) && !tcard.HasStatus(StatusType.Protected))
-                            {
-                                tcard.AddOngoingStatus(StatusType.Protected, 0); // 其他卡牌获得保护状态
-                            }
-                        }
-                    }
-
-                    // 状态加成
-                    foreach (CardStatus status in card.status)
-                        AddOngoingStatusBonus(card, status);
-                    foreach (CardStatus status in card.ongoing_status)
-                        AddOngoingStatusBonus(card, status);
-                }
-
-                for (int c = 0; c < player.cards_hand.Count; c++)
-                {
-                    Card card = player.cards_hand[c];
-                    // 状态加成
-                    foreach (CardStatus status in card.status)
-                        AddOngoingStatusBonus(card, status);
-                    foreach (CardStatus status in card.ongoing_status)
-                        AddOngoingStatusBonus(card, status);
-                }
-            }
+            ongoingSystem.UpdateOngoings(this);
         }
-
-        protected virtual void UpdateOngoingKills()
-        {
-            // 杀死HP为0的卡牌
-            for (int p = 0; p < game_data.players.Length; p++)
-            {
-                Player player = game_data.players[p];
-                for (int i = player.cards_board.Count - 1; i >= 0; i--)
-                {
-                    if (i < player.cards_board.Count)
-                    {
-                        Card card = player.cards_board[i];
-                        if (card.GetHP() <= 0)
-                            DiscardCard(card);
-                    }
-                }
-                for (int i = player.cards_equip.Count - 1; i >= 0; i--)
-                {
-                    if (i < player.cards_equip.Count)
-                    {
-                        Card card = player.cards_equip[i];
-                        if (card.GetHP() <= 0)
-                            DiscardCard(card);
-                        Card bearer = player.GetBearerCard(card);
-                        if (bearer == null)
-                            DiscardCard(card);
-                    }
-                }
-            }
-
-            // 清理卡牌
-            for (int c = 0; c < cards_to_clear.Count; c++)
-                cards_to_clear[c].Clear();
-            cards_to_clear.Clear();
-        }
-
-        protected virtual void UpdateOngoingAbilities(Player player, Card card)
-        {
-            if (card == null || !card.CanDoAbilities())
-                return;
-
-            List<AbilityData> cabilities = card.GetAbilities();
-            for (int a = 0; a < cabilities.Count; a++)
-            {
-                AbilityData ability = cabilities[a];
-                if (ability != null && ability.trigger == AbilityTrigger.Ongoing && ability.AreTriggerConditionsMet(game_data, card))
-                {
-                    if (ability.target == AbilityTarget.Self)
-                    {
-                        if (ability.AreTargetConditionsMet(game_data, card, card))
-                        {
-                            ability.DoOngoingEffects(this, card, card); // 对自身执行持续效果
-                        }
-                    }
-
-                    if (ability.target == AbilityTarget.PlayerSelf)
-                    {
-                        if (ability.AreTargetConditionsMet(game_data, card, player))
-                        {
-                            ability.DoOngoingEffects(this, card, player); // 对自身玩家执行持续效果
-                        }
-                    }
-
-                    if (ability.target == AbilityTarget.AllPlayers || ability.target == AbilityTarget.PlayerOpponent)
-                    {
-                        for (int tp = 0; tp < game_data.players.Length; tp++)
-                        {
-                            if (ability.target == AbilityTarget.AllPlayers || tp != player.player_id)
-                            {
-                                Player oplayer = game_data.players[tp];
-                                if (ability.AreTargetConditionsMet(game_data, card, oplayer))
-                                {
-                                    ability.DoOngoingEffects(this, card, oplayer); // 对目标玩家执行持续效果
-                                }
-                            }
-                        }
-                    }
-
-                    if (ability.target == AbilityTarget.EquippedCard)
-                    {
-                        if (card.CardData.IsEquipment())
-                        {
-                            // 获取装备的承载者
-                            Card target = player.GetBearerCard(card);
-                            if (target != null && ability.AreTargetConditionsMet(game_data, card, target))
-                            {
-                                ability.DoOngoingEffects(this, card, target); // 对承载者执行持续效果
-                            }
-                        }
-                        else if (card.equipped_uid != null)
-                        {
-                            // 获取被装备的卡牌
-                            Card target = game_data.GetCard(card.equipped_uid);
-                            if (target != null && ability.AreTargetConditionsMet(game_data, card, target))
-                            {
-                                ability.DoOngoingEffects(this, card, target); // 对装备卡牌执行持续效果
-                            }
-                        }
-                    }
-
-                    if (ability.target == AbilityTarget.AllCardsAllPiles || ability.target == AbilityTarget.AllCardsHand || ability.target == AbilityTarget.AllCardsBoard)
-                    {
-                        for (int tp = 0; tp < game_data.players.Length; tp++)
-                        {
-                            Player tplayer = game_data.players[tp];
-
-                            // 手牌卡牌
-                            if (ability.target == AbilityTarget.AllCardsAllPiles || ability.target == AbilityTarget.AllCardsHand)
-                            {
-                                for (int tc = 0; tc < tplayer.cards_hand.Count; tc++)
-                                {
-                                    Card tcard = tplayer.cards_hand[tc];
-                                    if (ability.AreTargetConditionsMet(game_data, card, tcard))
-                                    {
-                                        ability.DoOngoingEffects(this, card, tcard);
-                                    }
-                                }
-                            }
-
-                            // 场上卡牌
-                            if (ability.target == AbilityTarget.AllCardsAllPiles || ability.target == AbilityTarget.AllCardsBoard)
-                            {
-                                for (int tc = 0; tc < tplayer.cards_board.Count; tc++)
-                                {
-                                    Card tcard = tplayer.cards_board[tc];
-                                    if (ability.AreTargetConditionsMet(game_data, card, tcard))
-                                    {
-                                        ability.DoOngoingEffects(this, card, tcard);
-                                    }
-                                }
-                            }
-
-                            // 装备卡牌
-                            if (ability.target == AbilityTarget.AllCardsAllPiles)
-                            {
-                                for (int tc = 0; tc < tplayer.cards_equip.Count; tc++)
-                                {
-                                    Card tcard = tplayer.cards_equip[tc];
-                                    if (ability.AreTargetConditionsMet(game_data, card, tcard))
-                                    {
-                                        ability.DoOngoingEffects(this, card, tcard);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        protected virtual void AddOngoingStatusBonus(Card card, CardStatus status)
-        {
-            if (status.type == StatusType.AddAttack)
-                card.attack_ongoing += status.value; // 攻击力加成
-            if (status.type == StatusType.AddHP)
-                card.hp_ongoing += status.value; // 生命值加成
-            if (status.type == StatusType.AddManaCost)
-                card.mana_ongoing += status.value; // 法力消耗加成
-        }
-
 
        //---- 秘密卡相关 ------------
 
