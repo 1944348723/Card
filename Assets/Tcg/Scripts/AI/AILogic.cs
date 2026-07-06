@@ -71,7 +71,7 @@ namespace TcgEngine.AI
             job.ai_level = level;
 
             job.heuristic = new AIHeuristic(player_id, level);
-            job.game_logic = new GameLogic(true); // true = 禁用动画，纯逻辑
+            job.game_logic = new GameLogic(null, true); // true = 禁用动画，纯逻辑
 
             return job;
         }

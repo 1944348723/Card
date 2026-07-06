@@ -4,18 +4,14 @@ namespace TcgEngine.Gameplay
 {
     public sealed class CardSystem
     {
-        private Game game;
-        private readonly CardZoneService cardZoneService;
+        private readonly GameRuntimeContext runtimeContext;
+        
+        private Game game => runtimeContext.Game;
+        private CardZoneService cardZoneService => runtimeContext.CardZoneService;
 
-        public CardSystem(Game game, CardZoneService zones)
+        public CardSystem(GameRuntimeContext context)
         {
-            this.game = game;
-            this.cardZoneService = zones;
-        }
-
-        public void SetData(Game game)
-        {
-            this.game = game;
+            this.runtimeContext = context;
         }
 
         public void ShuffleDeck(List<Card> cards, System.Random random)

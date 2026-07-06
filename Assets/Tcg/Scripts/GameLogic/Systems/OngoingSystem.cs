@@ -4,16 +4,13 @@ namespace TcgEngine.Gameplay
 {
     public sealed class OngoingSystem
     {
-        private Game game;
+        private readonly GameRuntimeContext runtimeContext;
 
-        public OngoingSystem(Game game)
-        {
-            this.game = game;
-        }
+        private Game game => runtimeContext.Game;
 
-        public void SetData(Game game)
+        public OngoingSystem(GameRuntimeContext context)
         {
-            this.game = game;
+            this.runtimeContext = context;
         }
 
         public void UpdateOngoings(GameLogic logic)
