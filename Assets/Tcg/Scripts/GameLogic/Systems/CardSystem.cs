@@ -107,7 +107,7 @@ namespace TcgEngine.Gameplay
         }
         
         // 杀掉HP为0的卡牌
-        public void CleanupInvalidCards(GameLogic logic, List<Card> cardsToClear)
+        public void CleanupInvalidCards(List<Card> cardsToClear)
         {
             foreach (Player player in game.players)
             {
@@ -115,7 +115,7 @@ namespace TcgEngine.Gameplay
                 {
                     if (i < player.cards_board.Count && player.cards_board[i].GetHP() <= 0)
                     {
-                        logic.DiscardCard(player.cards_board[i]);
+                        runtimeContext.Logic.DiscardCard(player.cards_board[i]);
                     }
                 }
 
@@ -127,7 +127,7 @@ namespace TcgEngine.Gameplay
                     Card card = player.cards_equip[i];
                     if (card.GetHP() <= 0 || player.GetBearerCard(card) == null)
                     {
-                        logic.DiscardCard(card);
+                        runtimeContext.Logic.DiscardCard(card);
                     }
                 }
             }

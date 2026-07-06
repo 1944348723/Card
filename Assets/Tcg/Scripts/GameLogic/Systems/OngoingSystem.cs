@@ -13,11 +13,11 @@ namespace TcgEngine.Gameplay
             this.runtimeContext = context;
         }
 
-        public void UpdateOngoings(GameLogic logic)
+        public void UpdateOngoings()
         {
             Profiler.BeginSample("Update Ongoing");
             ClearOngoings();
-            ApplyOngoingAbilities(logic);
+            ApplyOngoingAbilities();
             ApplyDerivedStatusEffects();
             Profiler.EndSample();
         }
@@ -46,25 +46,25 @@ namespace TcgEngine.Gameplay
             }
         }
 
-        private void ApplyOngoingAbilities(GameLogic logic)
+        private void ApplyOngoingAbilities()
         {
             foreach (Player player in game.players)
             {
-                UpdateAbilities(logic, player, player.hero);  // 更新英雄持续能力
+                UpdateAbilities(player, player.hero);  // 更新英雄持续能力
 
                 foreach (Card card in player.cards_board)
                 {
-                    UpdateAbilities(logic, player, card);
+                    UpdateAbilities(player, card);
                 }
 
                 foreach (Card card in player.cards_equip)
                 {
-                    UpdateAbilities(logic, player, card);
+                    UpdateAbilities(player, card);
                 }
             }
         }
 
-        private void UpdateAbilities(GameLogic logic, Player player, Card card)
+        private void UpdateAbilities(Player player, Card card)
         {
             if (card == null || !card.CanDoAbilities()) return;
 
@@ -73,7 +73,7 @@ namespace TcgEngine.Gameplay
                 if (ability == null || ability.trigger != AbilityTrigger.Ongoing) continue;
                 if (!ability.AreTriggerConditionsMet(game, card)) continue;
 
-                ResolveOngoingAbility(logic, player, card, ability);
+                ResolveOngoingAbility(player, card, ability);
             }
         }
 
@@ -127,8 +127,10 @@ namespace TcgEngine.Gameplay
                 card.mana_ongoing += status.value;
         }
 
-        private void ResolveOngoingAbility(GameLogic logic, Player player, Card card, AbilityData ability)
+        private void ResolveOngoingAbility(Player player, Card card, AbilityData ability)
         {
+            GameLogic logic = runtimeContext.Logic;
+            
             if (ability.target == AbilityTarget.Self)
             {
                 if (ability.AreTargetConditionsMet(game, card, card))

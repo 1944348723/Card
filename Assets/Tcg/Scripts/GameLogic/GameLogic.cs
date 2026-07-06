@@ -946,7 +946,7 @@ namespace TcgEngine.Gameplay
                 TriggerCardAbilityType(AbilityTrigger.OnDeath, card);
                 TriggerOtherCardsAbilityType(AbilityTrigger.OnDeathOther, card);
                 TriggerSecrets(AbilityTrigger.OnDeathOther, card);
-                runtime.OngoingSystem.UpdateOngoings(this);
+                runtime.OngoingSystem.UpdateOngoings();
             }
 
             runtime.CardsToClear.Add(card); // 在下次 UpdateOngoing 中清理，以处理同时伤害效果
@@ -1257,8 +1257,8 @@ namespace TcgEngine.Gameplay
         // 基本逻辑是先将加成清零（CleanOngoing），再重新计算以确保持续效果存在
         public virtual void UpdateOngoings()
         {
-            runtime.OngoingSystem.UpdateOngoings(this);
-            runtime.CardSystem.CleanupInvalidCards(this, runtime.CardsToClear);
+            runtime.OngoingSystem.UpdateOngoings();
+            runtime.CardSystem.CleanupInvalidCards(runtime.CardsToClear);
         }
 
        //---- 秘密卡相关 ------------

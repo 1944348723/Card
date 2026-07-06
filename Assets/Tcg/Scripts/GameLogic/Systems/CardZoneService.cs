@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace TcgEngine.Gameplay
 {
     public enum CardZone
@@ -32,7 +34,7 @@ namespace TcgEngine.Gameplay
             return true;
         }
 
-        private System.Collections.Generic.List<Card> GetPile(Player player, CardZone zone)
+        private List<Card> GetPile(Player player, CardZone zone)
         {
             return zone switch
             {
