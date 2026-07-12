@@ -39,7 +39,8 @@ namespace TcgEngine.Gameplay
         }
     }
 
-    public class HealthSystem
+    /// <summary>伤害和治疗的基础数值结算，不负责事件与触发器。</summary>
+    public sealed class HealthResolver
     {
         public DamageResult DamagePlayer(Player target, int value)
         {

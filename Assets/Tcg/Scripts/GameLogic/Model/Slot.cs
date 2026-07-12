@@ -5,7 +5,7 @@ using Unity.Netcode;
 namespace TcgEngine
 {
     /// <summary>
-    /// 表示游戏中的一个槽位（数据结构）
+    /// 状态模型：表示游戏中的一个槽位。
     /// </summary>
 
     [System.Serializable]

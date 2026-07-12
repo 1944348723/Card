@@ -2,7 +2,7 @@
 namespace TcgEngine
 {
     /// <summary>
-    /// 游戏动作列表及刷新操作
+    /// 网络协议中的游戏动作与刷新操作。
     /// 这些动作可以由玩家执行，或者由服务器发送给客户端
     /// </summary>
     public static class GameAction

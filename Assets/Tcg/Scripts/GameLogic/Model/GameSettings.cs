@@ -2,7 +2,7 @@
 
 namespace TcgEngine
 {
-    // 游戏类型枚举
+    // 游戏设置状态使用的类型枚举。
     [System.Serializable]
     public enum GameType
     {

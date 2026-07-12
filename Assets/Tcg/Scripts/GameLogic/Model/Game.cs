@@ -2,7 +2,7 @@
 
 namespace TcgEngine
 {
-    // 包含游戏玩法的所有状态数据（在网络中同步）
+    // 状态模型：包含网络同步的整局游戏数据。
     [System.Serializable]
     public class Game
     {
@@ -83,250 +83,85 @@ namespace TcgEngine
         // 检查是否轮到玩家行动（包括常规操作和选择器）
         public virtual bool IsPlayerTurn(Player player)
         {
-            return IsPlayerActionTurn(player) || IsPlayerSelectorTurn(player);
+            return Gameplay.RuleValidator.IsPlayerTurn(this, player);
         }
 
         // 检查玩家是否轮到常规操作（打牌、攻击、技能）
         public virtual bool IsPlayerActionTurn(Player player)
         {
-            return player != null && current_player == player.player_id 
-                && state == GameState.Play && phase == GamePhase.Main && selector == SelectorType.None;
+            return Gameplay.RuleValidator.IsPlayerActionTurn(this, player);
         }
 
         // 检查玩家是否轮到选择器操作（技能目标选择等）
         public virtual bool IsPlayerSelectorTurn(Player player)
         {
-            return player != null && selector_player_id == player.player_id 
-                && state == GameState.Play && phase == GamePhase.Main && selector != SelectorType.None;
+            return Gameplay.RuleValidator.IsPlayerSelectorTurn(this, player);
         }
 
         // 检查玩家是否轮到换牌（Mulligan）
         public virtual bool IsPlayerMulliganTurn(Player player)
         {
-            return phase == GamePhase.Mulligan && !player.ready;
+            return Gameplay.RuleValidator.IsPlayerMulliganTurn(this, player);
         }
 
         // 检查玩家是否可以打出卡牌到指定槽位
         public virtual bool CanPlayCard(Card card, Slot slot, bool skip_cost = false)
         {
-            if (card == null) return false;
-
-            Player player = GetPlayer(card.player_id);
-
-            if (!player.HasCardInHand(card))    return false;
-            // 法力不足
-            if (!skip_cost && !player.CanPayMana(card)) return false;
-            // AI不能在0法力打X-cost卡
-            if (player.is_ai && card.CardData.IsDynamicManaCost() && player.mana == 0)  return false; 
-
-            // 根据卡牌类型判断槽位是否合法
-            if (card.CardData.IsBoardCard())
-            {
-                return slot.IsBoardSlot() && !HasCardOnSlot(slot) && slot.BelongsToPlayer(card.player_id);
-            }
-            if (card.CardData.IsEquipment())
-            {
-                if (!slot.IsBoardSlot())     return false;
-
-                Card target = GetSlotCard(slot);
-                bool isSameTeamCharacter = target != null
-                                        && target.CardData.type == CardType.Character
-                                        && target.player_id == card.player_id;
-                return isSameTeamCharacter;
-            }
-            if (card.CardData.IsRequireTargetSpell())
-            {
-                return IsPlayTargetValid(card, slot);
-            }
-            if (card.CardData.type == CardType.Spell)
-            {
-                return CanAnyPlayAbilityTrigger(card); // 检查法术的OnPlay技能触发条件
-            }
-            return true;
+            return Gameplay.RuleValidator.CanPlayCard(this, card, slot, skip_cost);
         }
 
         // 检查卡牌是否允许移动到指定槽位
         public virtual bool CanMoveCard(Card card, Slot slot, bool skip_cost = false)
         {
-            if (card == null || !slot.IsBoardSlot())
-                return false;
-
-            if (!IsOnBoard(card))
-                return false; // 只能移动已在场上的卡牌
-
-            if (!card.CanMove(skip_cost))
-                return false; // 卡牌不能移动
-
-            if (!slot.BelongsToPlayer(card.player_id))
-                return false; // 不能移动到敌方槽位
-
-            if (card.slot == slot)
-                return false; // 不能移动到原位置
-
-            Card slot_card = GetSlotCard(slot);
-            if (slot_card != null)
-                return false; // 目标槽已被占用
-
-            return true;
+            return Gameplay.RuleValidator.CanMoveCard(this, card, slot, skip_cost);
         }
 
         // 检查卡牌是否允许攻击玩家
         public virtual bool CanAttackTarget(Card attacker, Player target, bool skip_cost = false)
         {
-            if(attacker == null || target == null)
-                return false;
-
-            if (!attacker.CanAttack(skip_cost))
-                return false; // 卡牌不能攻击
-
-            if (attacker.player_id == target.player_id)
-                return false; // 不能攻击己方玩家
-
-            if (!IsOnBoard(attacker) || !attacker.CardData.IsCharacter())
-                return false; // 攻击者必须是场上角色
-
-            if (target.HasStatus(StatusType.Protected) && !attacker.HasStatus(StatusType.Flying))
-                return false; // 受保护状态阻挡攻击
-
-            return true;
+            return Gameplay.RuleValidator.CanAttackTarget(this, attacker, target, skip_cost);
         }
 
         // 检查卡牌是否允许攻击另一张卡
         public virtual bool CanAttackTarget(Card attacker, Card target, bool skip_cost = false)
         {
-            if (attacker == null || target == null)
-                return false;
-
-            if (!attacker.CanAttack(skip_cost))
-                return false; // 卡牌不能攻击
-
-            if (attacker.player_id == target.player_id)
-                return false; // 不能攻击己方卡牌
-
-            if (!IsOnBoard(attacker) || !IsOnBoard(target))
-                return false; // 攻击双方必须在场
-
-            if (!attacker.CardData.IsCharacter() || !target.CardData.IsBoardCard())
-                return false; // 只有角色可以攻击卡牌
-
-            if (target.HasStatus(StatusType.Stealth))
-                return false; // 潜行状态不可被攻击
-
-            if (target.HasStatus(StatusType.Protected) && !attacker.HasStatus(StatusType.Flying))
-                return false; // 邻近保护状态阻挡攻击
-
-            return true;
+            return Gameplay.RuleValidator.CanAttackTarget(this, attacker, target, skip_cost);
         }
 
         // 检查卡牌是否可以施放技能（主动技能）
         public virtual bool CanCastAbility(Card card, AbilityData ability)
         {
-            if (ability == null || card == null || !card.CanDoActivatedAbilities())
-                return false; // 卡牌不能施放
-
-            if (ability.trigger != AbilityTrigger.Activate)
-                return false; // 非主动技能
-
-            Player player = GetPlayer(card.player_id);
-            if (!player.CanPayAbility(card, ability))
-                return false; // 法力不足
-
-            if (!ability.AreTriggerConditionsMet(this, card))
-                return false; // 条件未满足
-
-            return true;
+            return Gameplay.RuleValidator.CanCastAbility(this, card, ability);
         }
 
         // 检查玩家选择技能是否可用（选择器）
         public virtual bool CanSelectAbility(Card card, AbilityData ability)
         {
-            if (ability == null || card == null || !card.CanDoAbilities())
-                return false; // 卡牌不能施放
-
-            Player player = GetPlayer(card.player_id);
-            if (!player.CanPayAbility(card, ability))
-                return false; // 法力不足
-
-            if (!ability.AreTriggerConditionsMet(this, card))
-                return false; // 条件未满足
-
-            return true;
+            return Gameplay.RuleValidator.CanSelectAbility(this, card, ability);
         }
 
         // 检查卡牌的OnPlay技能是否触发
         public virtual bool CanAnyPlayAbilityTrigger(Card card)
         {
-            if (card == null)
-                return false;
-            if (card.CardData.IsDynamicManaCost())
-                return true; // X-cost卡牌不受限制
-
-            foreach (AbilityData ability in card.GetAbilities())
-            {
-                if (ability.trigger == AbilityTrigger.OnPlay && ability.AreTriggerConditionsMet(this, card))
-                    return true;
-            }
-            return false;
+            return Gameplay.RuleValidator.CanAnyPlayAbilityTrigger(this, card);
         }
 
         // 检查法术或技能的目标是否合法（拖动到玩家）
         public virtual bool IsPlayTargetValid(Card caster, Player target)
         {
-            if (caster == null || target == null)
-                return false;
-
-            foreach (AbilityData ability in caster.GetAbilities())
-            {
-                if (ability && ability.trigger == AbilityTrigger.OnPlay && ability.target == AbilityTarget.PlayTarget)
-                {
-                    if (!ability.CanTarget(this, caster, target))
-                        return false;
-                }
-            }
-            return true;
+            return Gameplay.RuleValidator.IsPlayTargetValid(this, caster, target);
         }
 
         // 检查卡牌是否可以作为目标被施法（用于需要拖到另一张卡的法术）
         public virtual bool IsPlayTargetValid(Card caster, Card target)
         {
-            if (caster == null || target == null)
-                return false;
-
-            // 遍历卡牌的OnPlay技能，检查目标是否合法
-            foreach (AbilityData ability in caster.GetAbilities())
-            {
-                if (ability && ability.trigger == AbilityTrigger.OnPlay && ability.target == AbilityTarget.PlayTarget)
-                {
-                    if (!ability.CanTarget(this, caster, target))
-                        return false;
-                }
-            }
-            return true;
+            return Gameplay.RuleValidator.IsPlayTargetValid(this, caster, target);
         }
 
         // 检查槽位是否可以作为目标被施法（用于需要拖到槽位的法术）
         public virtual bool IsPlayTargetValid(Card caster, Slot target)
         {
-            if (caster == null)
-                return false;
-
-            if (target.IsPlayerSlot())
-                return IsPlayTargetValid(caster, GetPlayer(target.p)); // 如果槽位指向玩家，检查目标玩家
-
-            Card slot_card = GetSlotCard(target);
-            if (slot_card != null)
-                return IsPlayTargetValid(caster, slot_card); // 槽位上有卡牌，则检查该卡牌是否可作为目标
-
-            // 遍历卡牌的OnPlay技能，检查槽位目标是否合法
-            foreach (AbilityData ability in caster.GetAbilities())
-            {
-                if (ability && ability.trigger == AbilityTrigger.OnPlay && ability.target == AbilityTarget.PlayTarget)
-                {
-                    if (!ability.CanTarget(this, caster, target))
-                        return false;
-                }
-            }
-            return true;
+            return Gameplay.RuleValidator.IsPlayTargetValid(this, caster, target);
         }
 
         // 根据玩家ID获取玩家对象

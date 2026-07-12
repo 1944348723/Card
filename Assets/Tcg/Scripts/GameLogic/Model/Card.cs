@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TcgEngine
 {
-    // 表示游戏中卡牌的当前状态（仅数据部分）
+    // 状态模型：表示游戏中一张卡牌的当前数据。
     [System.Serializable]
     public class Card
     {

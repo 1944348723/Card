@@ -2,16 +2,17 @@ using System.Collections.Generic;
 
 namespace TcgEngine.Gameplay
 {
-    public sealed class CardSystem
+    /// <summary>卡牌的创建、抽取、装备、归属与死亡后清理。</summary>
+    public sealed class CardLifecycle
     {
-        private readonly GameRuntimeContext runtimeContext;
+        private readonly GameRuntime runtime;
         
-        private Game game => runtimeContext.Game;
-        private CardZoneService cardZoneService => runtimeContext.CardZoneService;
+        private Game game => runtime.Game;
+        private CardZoneManager zones => runtime.Zones;
 
-        public CardSystem(GameRuntimeContext context)
+        public CardLifecycle(GameRuntime runtime)
         {
-            this.runtimeContext = context;
+            this.runtime = runtime;
         }
 
         public void ShuffleDeck(List<Card> cards, System.Random random)
@@ -36,7 +37,7 @@ namespace TcgEngine.Gameplay
                 if (player.cards_deck.Count == 0)   break;
                 if (player.cards_hand.Count >= GameplayData.Get().cards_max)    break;
 
-                cardZoneService.MoveTo(player, player.cards_deck[0], CardZone.Hand);
+                zones.MoveTo(player, player.cards_deck[0], CardZone.Hand);
                 drawn++;
             }
 
@@ -49,7 +50,7 @@ namespace TcgEngine.Gameplay
             if (player == null || data == null || variant == null) return null;
 
             Card card = Card.Create(data, variant, player);
-            cardZoneService.MoveTo(player, card, CardZone.Hand);
+            zones.MoveTo(player, card, CardZone.Hand);
             game.last_summoned = card.uid;
             return card;
         }
@@ -62,7 +63,7 @@ namespace TcgEngine.Gameplay
             {
                 if (player.cards_hand.Count <= 0) break;
 
-                cardZoneService.MoveTo(player, player.cards_hand[0], CardZone.Discard);
+                zones.MoveTo(player, player.cards_hand[0], CardZone.Discard);
             }
         }
 
@@ -74,7 +75,7 @@ namespace TcgEngine.Gameplay
             Player player = game.GetPlayer(bearer.player_id);
             Card old = Unequip(bearer);
 
-            cardZoneService.MoveTo(player, equipment, CardZone.Equip);
+            zones.MoveTo(player, equipment, CardZone.Equip);
             bearer.equipped_uid = equipment.uid;
             equipment.slot = bearer.slot;
 
@@ -115,7 +116,7 @@ namespace TcgEngine.Gameplay
                 {
                     if (i < player.cards_board.Count && player.cards_board[i].GetHP() <= 0)
                     {
-                        runtimeContext.Logic.DiscardCard(player.cards_board[i]);
+                        runtime.Engine.DiscardCard(player.cards_board[i]);
                     }
                 }
 
@@ -127,7 +128,7 @@ namespace TcgEngine.Gameplay
                     Card card = player.cards_equip[i];
                     if (card.GetHP() <= 0 || player.GetBearerCard(card) == null)
                     {
-                        runtimeContext.Logic.DiscardCard(card);
+                        runtime.Engine.DiscardCard(card);
                     }
                 }
             }
@@ -137,6 +138,83 @@ namespace TcgEngine.Gameplay
                 card.Clear();
             }
             cardsToClear.Clear();
+        }
+
+        public Card Summon(Player player, CardData data, VariantData variant, Slot slot)
+        {
+            if (!slot.IsBoardSlot() || game.HasCardOnSlot(slot))
+                return null;
+
+            Card card = CreateInHand(player, data, variant);
+            runtime.Engine.PlayCard(card, slot, true);
+            runtime.Engine.onCardSummoned?.Invoke(card, slot);
+            return card;
+        }
+
+        public Card Transform(Card card, CardData transformTo)
+        {
+            card.SetCard(transformTo, card.VariantData);
+            runtime.Engine.onCardTransformed?.Invoke(card);
+            return card;
+        }
+
+        public void EquipAndDiscardExisting(Card bearer, Card equipment)
+        {
+            Card existing = Equip(bearer, equipment);
+            if (existing != null)
+                Discard(existing);
+        }
+
+        public void UnequipAndDiscard(Card bearer)
+        {
+            Card equipment = Unequip(bearer);
+            if (equipment != null)
+                Discard(equipment);
+        }
+
+        public void Kill(Card attacker, Card target)
+        {
+            if (attacker == null || target == null)
+                return;
+            if (!game.IsOnBoard(target) && !game.IsEquipped(target))
+                return;
+            if (target.HasStatus(StatusType.Invincibility))
+                return;
+
+            Player attackerOwner = game.GetPlayer(attacker.player_id);
+            if (attacker.player_id != target.player_id)
+                attackerOwner.kill_count++;
+
+            Discard(target);
+            runtime.Abilities.TriggerType(AbilityTrigger.OnKill, attacker, target);
+        }
+
+        public void Discard(Card card)
+        {
+            if (card == null || game.IsInDiscard(card))
+                return;
+
+            Player player = game.GetPlayer(card.player_id);
+            bool wasOnBoard = game.IsOnBoard(card) || game.IsEquipped(card);
+            UnequipAndDiscard(card);
+
+            zones.MoveTo(player, card, CardZone.Discard);
+            game.last_destroyed = card.uid;
+
+            Card bearer = player.GetBearerCard(card);
+            if (bearer != null)
+                bearer.equipped_uid = null;
+
+            if (wasOnBoard)
+            {
+                runtime.Abilities.TriggerType(AbilityTrigger.OnDeath, card);
+                runtime.Abilities.TriggerOtherCards(AbilityTrigger.OnDeathOther, card);
+                runtime.Secrets.TriggerSecrets(AbilityTrigger.OnDeathOther, card);
+                runtime.Ongoings.UpdateOngoings();
+            }
+
+            runtime.CardsToClear.Add(card);
+            runtime.Engine.onCardDiscarded?.Invoke(card);
         }
     }
 }

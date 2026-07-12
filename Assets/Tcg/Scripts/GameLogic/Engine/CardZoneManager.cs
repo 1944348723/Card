@@ -13,7 +13,8 @@ namespace TcgEngine.Gameplay
         Temp,
     }
 
-    public class CardZoneService
+    /// <summary>所有卡牌区域变更的唯一入口。</summary>
+    public sealed class CardZoneManager
     {
         public bool MoveTo(Player player, Card card, CardZone zone)
         {
@@ -32,6 +33,11 @@ namespace TcgEngine.Gameplay
             player.cards_board.Add(card);
             card.slot = slot;
             return true;
+        }
+
+        public void ClearTemporary(Player player)
+        {
+            player?.cards_temp.Clear();
         }
 
         private List<Card> GetPile(Player player, CardZone zone)

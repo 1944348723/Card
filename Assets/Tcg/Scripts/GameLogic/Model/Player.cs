@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TcgEngine
 {
-    // 表示玩家在游戏中的当前状态（仅数据，不包含逻辑）
+    // 状态模型：表示玩家在游戏中的当前数据。
     [System.Serializable]
     public class Player
     {

@@ -2,15 +2,16 @@ using UnityEngine.Profiling;
 
 namespace TcgEngine.Gameplay
 {
-    public sealed class OngoingSystem
+    /// <summary>每次状态变化后重建持续效果。</summary>
+    public sealed class OngoingResolver
     {
-        private readonly GameRuntimeContext runtimeContext;
+        private readonly GameRuntime runtime;
 
-        private Game game => runtimeContext.Game;
+        private Game game => runtime.Game;
 
-        public OngoingSystem(GameRuntimeContext context)
+        public OngoingResolver(GameRuntime runtime)
         {
-            this.runtimeContext = context;
+            this.runtime = runtime;
         }
 
         public void UpdateOngoings()
@@ -129,7 +130,7 @@ namespace TcgEngine.Gameplay
 
         private void ResolveOngoingAbility(Player player, Card card, AbilityData ability)
         {
-            GameLogic logic = runtimeContext.Logic;
+            GameLogic logic = runtime.Engine;
             
             if (ability.target == AbilityTarget.Self)
             {
