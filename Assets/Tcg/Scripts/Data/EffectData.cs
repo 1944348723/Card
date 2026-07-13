@@ -12,7 +12,7 @@ namespace TcgEngine
         /// <summary>
         /// 对服务器端游戏逻辑应用效果（无指定目标）
         /// </summary>
-        public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster)
+        public virtual void DoEffect(EffectContext context, AbilityData ability, Card caster)
         {
             // 服务器端的游戏逻辑
         }
@@ -20,7 +20,7 @@ namespace TcgEngine
         /// <summary>
         /// 对指定卡牌目标施加效果
         /// </summary>
-        public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public virtual void DoEffect(EffectContext context, AbilityData ability, Card caster, Card target)
         {
             // 服务器端的游戏逻辑
         }
@@ -28,7 +28,7 @@ namespace TcgEngine
         /// <summary>
         /// 对指定玩家目标施加效果
         /// </summary>
-        public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public virtual void DoEffect(EffectContext context, AbilityData ability, Card caster, Player target)
         {
             // 服务器端的游戏逻辑
         }
@@ -36,7 +36,7 @@ namespace TcgEngine
         /// <summary>
         /// 对指定格子目标施加效果
         /// </summary>
-        public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster, Slot target)
+        public virtual void DoEffect(EffectContext context, AbilityData ability, Card caster, Slot target)
         {
             // 服务器端的游戏逻辑
         }
@@ -44,7 +44,7 @@ namespace TcgEngine
         /// <summary>
         /// 对指定卡牌数据目标施加效果（主要用于生成新卡效果）
         /// </summary>
-        public virtual void DoEffect(GameLogic logic, AbilityData ability, Card caster, CardData target)
+        public virtual void DoEffect(EffectContext context, AbilityData ability, Card caster, CardData target)
         {
             // 服务器端的游戏逻辑
         }
@@ -52,7 +52,7 @@ namespace TcgEngine
         /// <summary>
         /// 持续效果，仅作用于卡牌目标
         /// </summary>
-        public virtual void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public virtual void DoOngoingEffect(EffectContext context, AbilityData ability, Card caster, Card target)
         {
             // 持续效果逻辑
         }
@@ -60,7 +60,7 @@ namespace TcgEngine
         /// <summary>
         /// 持续效果，仅作用于玩家目标
         /// </summary>
-        public virtual void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public virtual void DoOngoingEffect(EffectContext context, AbilityData ability, Card caster, Player target)
         {
             // 持续效果逻辑
         }

@@ -383,9 +383,9 @@ namespace TcgEngine.AI
                 // 随从类卡片
                 if (card.CardData.IsBoardCard())
                 {
-                    Slot slot = player.GetRandomEmptySlot(random_gen, slot_array.Get());
+                    Slot slot = player.GetRandomEmptySlot(data.Board, random_gen, slot_array.Get());
 
-                    if (data.CanPlayCard(card, slot))
+                    if (game_logic.Rules.CanPlayCard(card, slot))
                     {
                         AIAction action = CreateAction(type, card);
                         action.slot = slot;
@@ -399,7 +399,7 @@ namespace TcgEngine.AI
                     for (int c = 0; c < tplayer.cards_board.Count; c++)
                     {
                         Card tcard = tplayer.cards_board[c];
-                        if (data.CanPlayCard(card, tcard.slot))
+                        if (game_logic.Rules.CanPlayCard(card, tcard.slot))
                         {
                             AIAction action = CreateAction(type, card);
                             action.slot = tcard.slot;
@@ -416,7 +416,7 @@ namespace TcgEngine.AI
                     {
                         Player tplayer = data.players[p];
                         Slot tslot = new Slot(tplayer.player_id);
-                        if (data.CanPlayCard(card, tslot))
+                        if (game_logic.Rules.CanPlayCard(card, tslot))
                         {
                             AIAction action = CreateAction(type, card);
                             action.slot = tslot;
@@ -426,9 +426,9 @@ namespace TcgEngine.AI
                     }
 
                     // 目标是随从
-                    foreach (Slot slot in Slot.GetAll())
+                    foreach (Slot slot in data.Board.GetAll())
                     {
-                        if (data.CanPlayCard(card, slot))
+                        if (game_logic.Rules.CanPlayCard(card, slot))
                         {
                             Card slot_card = data.GetSlotCard(slot);
                             AIAction action = CreateAction(type, card);
@@ -439,7 +439,7 @@ namespace TcgEngine.AI
                     }
                 }
                 // 无目标法术
-                else if (data.CanPlayCard(card, Slot.None))
+                else if (game_logic.Rules.CanPlayCard(card, Slot.None))
                 {
                     AIAction action = CreateAction(type, card);
                     actions.Add(action);
@@ -459,7 +459,7 @@ namespace TcgEngine.AI
                             for (int tc = 0; tc < oplayer.cards_board.Count; tc++)
                             {
                                 Card target = oplayer.cards_board[tc];
-                                if (data.CanAttackTarget(card, target))
+                                if (game_logic.Rules.CanAttackTarget(card, target))
                                 {
                                     AIAction action = CreateAction(type, card);
                                     action.target_uid = target.uid;
@@ -481,7 +481,7 @@ namespace TcgEngine.AI
                         if (p != player.player_id)
                         {
                             Player oplayer = data.players[p];
-                            if (data.CanAttackTarget(card, oplayer))
+                            if (game_logic.Rules.CanAttackTarget(card, oplayer))
                             {
                                 AIAction action = CreateAction(type, card);
                                 action.target_player_id = oplayer.player_id;
@@ -502,7 +502,7 @@ namespace TcgEngine.AI
 
                     // 必须是可主动释放 + 有合法目标
                     if (ability.trigger == AbilityTrigger.Activate &&
-                        data.CanCastAbility(card, ability) &&
+                        game_logic.Rules.CanCastAbility(card, ability) &&
                         ability.HasValidSelectTarget(data, card))
                     {
                         AIAction action = CreateAction(type, card);
@@ -515,9 +515,9 @@ namespace TcgEngine.AI
             // ----------------- 移动卡片 -----------------
             if (type == GameAction.Move)
             {
-                foreach (Slot slot in Slot.GetAll(player.player_id))
+                foreach (Slot slot in data.Board.GetAll(player.player_id))
                 {
-                    if (data.CanMoveCard(card, slot))
+                    if (game_logic.Rules.CanMoveCard(card, slot))
                     {
                         AIAction action = CreateAction(type, card);
                         action.slot = slot;
@@ -555,7 +555,7 @@ namespace TcgEngine.AI
                 }
 
                 // 选择随从 or 空槽
-                foreach (Slot slot in Slot.GetAll())
+                foreach (Slot slot in data.Board.GetAll())
                 {
                     Card tcard = data.GetSlotCard(slot);
 
@@ -595,7 +595,7 @@ namespace TcgEngine.AI
                 for (int i = 0; i < ability.chain_abilities.Length; i++)
                 {
                     AbilityData choice = ability.chain_abilities[i];
-                    if (choice != null && data.CanSelectAbility(caster, choice))
+                    if (choice != null && game_logic.Rules.CanSelectAbility(caster, choice))
                     {
                         AIAction action = CreateAction(GameAction.SelectChoice, caster);
                         action.value = i;

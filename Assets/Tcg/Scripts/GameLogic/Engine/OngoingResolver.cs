@@ -130,13 +130,13 @@ namespace TcgEngine.Gameplay
 
         private void ResolveOngoingAbility(Player player, Card card, AbilityData ability)
         {
-            GameLogic logic = runtime.Engine;
+            EffectContext context = runtime.Effects;
             
             if (ability.target == AbilityTarget.Self)
             {
                 if (ability.AreTargetConditionsMet(game, card, card))
                 {
-                    ability.DoOngoingEffects(logic, card, card);
+                    ability.DoOngoingEffects(context, card, card);
                 }
             }
 
@@ -144,7 +144,7 @@ namespace TcgEngine.Gameplay
             {
                 if (ability.AreTargetConditionsMet(game, card, player))
                 {
-                    ability.DoOngoingEffects(logic, card, player);
+                    ability.DoOngoingEffects(context, card, player);
                 }
             }
 
@@ -157,7 +157,7 @@ namespace TcgEngine.Gameplay
 
                     if (ability.AreTargetConditionsMet(game, card, targetPlayer))
                     {
-                        ability.DoOngoingEffects(logic, card, targetPlayer);
+                        ability.DoOngoingEffects(context, card, targetPlayer);
                     }
                 }
             }
@@ -170,7 +170,7 @@ namespace TcgEngine.Gameplay
                     Card target = player.GetBearerCard(card);
                     if (target != null && ability.AreTargetConditionsMet(game, card, target))
                     {
-                        ability.DoOngoingEffects(logic, card, target); // 对承载者执行持续效果
+                        ability.DoOngoingEffects(context, card, target); // 对承载者执行持续效果
                     }
                 }
                 else if (card.equipped_uid != null)
@@ -179,7 +179,7 @@ namespace TcgEngine.Gameplay
                     Card target = game.GetCard(card.equipped_uid);
                     if (target != null && ability.AreTargetConditionsMet(game, card, target))
                     {
-                        ability.DoOngoingEffects(logic, card, target); // 对装备卡牌执行持续效果
+                        ability.DoOngoingEffects(context, card, target); // 对装备卡牌执行持续效果
                     }
                 }
             }
@@ -197,7 +197,7 @@ namespace TcgEngine.Gameplay
                         {
                             if (ability.AreTargetConditionsMet(game, card, targetCard))
                             {
-                                ability.DoOngoingEffects(logic, card, targetCard);
+                                ability.DoOngoingEffects(context, card, targetCard);
                             }
                         }
                     }
@@ -209,7 +209,7 @@ namespace TcgEngine.Gameplay
                         {
                             if (ability.AreTargetConditionsMet(game, card, targetCard))
                             {
-                                ability.DoOngoingEffects(logic, card, targetCard);
+                                ability.DoOngoingEffects(context, card, targetCard);
                             }
                         }
                     }
@@ -221,7 +221,7 @@ namespace TcgEngine.Gameplay
                         {
                             if (ability.AreTargetConditionsMet(game, card, targetCard))
                             {
-                                ability.DoOngoingEffects(logic, card, targetCard);
+                                ability.DoOngoingEffects(context, card, targetCard);
                             }
                         }
                     }

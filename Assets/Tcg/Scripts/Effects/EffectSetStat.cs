@@ -18,7 +18,7 @@ namespace TcgEngine
         public EffectStatType type;  // 要设置的属性类型（HP/Attack/Mana）
 
         // 对玩家目标执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             if (type == EffectStatType.HP)
             {
@@ -33,7 +33,7 @@ namespace TcgEngine
         }
 
         // 对卡牌目标执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             if (type == EffectStatType.Attack)
                 target.attack = ability.value; // 设置卡牌攻击力
@@ -49,7 +49,7 @@ namespace TcgEngine
         }
 
         // 对卡牌执行持续效果（Ongoing）
-        public override void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoOngoingEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             if (type == EffectStatType.Attack)
                 target.attack = ability.value; // 设置攻击力

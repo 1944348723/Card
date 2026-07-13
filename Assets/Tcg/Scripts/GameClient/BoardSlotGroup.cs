@@ -38,7 +38,8 @@ namespace TcgEngine.Client
         private void Start()
         {
             // 检查 group slot 是否超出棋盘允许范围
-            if (min_x < Slot.x_min || max_x > Slot.x_max || y < Slot.y_min || y > Slot.y_max)
+            BoardLayout board = GetBoardLayout();
+            if (min_x < board.MinX || max_x > board.MaxX || y < board.MinY || y > board.MaxY)
                 Debug.LogError("Board Slot X / Y 必须在 Slot.cs 的范围内，否则无效。");
 
             // 连接游戏事件
@@ -54,7 +55,7 @@ namespace TcgEngine.Client
         /// </summary>
         private void OnConnect()
         {
-            foreach (Slot slot in Slot.GetAll())
+            foreach (Slot slot in GetBoardLayout().GetAll())
             {
                 // 只把属于这个 Group 的 Slot 加入进来
                 if (IsInGroup(slot))
@@ -89,7 +90,7 @@ namespace TcgEngine.Client
             {
                 foreach (GroupSlot slot in group_slots)
                 {
-                    if(gdata.CanPlayCard(dcard, slot.slot))
+                    if(GameClient.Get().Rules.CanPlayCard(dcard, slot.slot))
                         target_alpha = 1f; // 只要有一个合法 slot → 整组高亮
                 }
             }
@@ -202,7 +203,7 @@ namespace TcgEngine.Client
                 int pid = GameClient.Get().GetPlayerID();
                 int px = x;
                 if ((pid % 2) == 1)
-                    px = Slot.x_max - x + Slot.x_min;
+                    px = GetBoardLayout().MirrorX(x);
                 return new Slot(px, y, p);
             }
 
@@ -212,7 +213,7 @@ namespace TcgEngine.Client
                 int pid = GameClient.Get().GetPlayerID();
                 int py = y;
                 if ((pid % 2) == 1)
-                    py = Slot.y_max - y + Slot.y_min;
+                    py = GetBoardLayout().MirrorY(y);
                 return new Slot(x, py, p);
             }
 
@@ -225,6 +226,12 @@ namespace TcgEngine.Client
                 p = GameClient.Get().GetOpponentPlayerID();
            
             return new Slot(x, y, p);
+        }
+
+        private BoardLayout GetBoardLayout()
+        {
+            Game game = GameClient.Get()?.GetGameData();
+            return game?.Board ?? BoardLayout.Default;
         }
 
         /// <summary>

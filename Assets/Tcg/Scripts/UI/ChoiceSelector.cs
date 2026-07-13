@@ -65,7 +65,7 @@ namespace TcgEngine.UI
                 {
                     ChoiceSelectorChoice achoice = choices[index];
                     achoice.SetChoice(index, choice);                       // 设置选项
-                    achoice.SetInteractable(gdata.CanSelectAbility(caster, choice)); // 是否可点击
+                    achoice.SetInteractable(GameClient.Get().Rules.CanSelectAbility(caster, choice)); // 是否可点击
                     index++;
                 }
             }

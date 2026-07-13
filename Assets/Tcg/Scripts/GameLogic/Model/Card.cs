@@ -662,6 +662,16 @@ namespace TcgEngine
         // 克隆字典（深度克隆每张卡牌）
         public static void CloneDict(Dictionary<string, Card> source, Dictionary<string, Card> dest)
         {
+            List<string> staleKeys = new List<string>();
+            foreach (string key in dest.Keys)
+            {
+                if (!source.ContainsKey(key))
+                    staleKeys.Add(key);
+            }
+
+            foreach (string key in staleKeys)
+                dest.Remove(key);
+
             foreach (KeyValuePair<string, Card> pair in source)
             {
                 bool valid = dest.TryGetValue(pair.Key, out Card val);
@@ -679,13 +689,16 @@ namespace TcgEngine
             {
                 Card scard = source[i];
                 bool valid = ref_dict.TryGetValue(scard.uid, out Card rcard);
-                if (valid)
+                if (!valid)
                 {
-                    if (i < dest.Count)
-                        dest[i] = rcard;
-                    else
-                        dest.Add(rcard);
+                    rcard = CloneNew(scard);
+                    ref_dict[scard.uid] = rcard;
                 }
+
+                if (i < dest.Count)
+                    dest[i] = rcard;
+                else
+                    dest.Add(rcard);
             }
 
             if(dest.Count > source.Count)

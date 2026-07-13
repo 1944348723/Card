@@ -20,17 +20,17 @@ namespace TcgEngine
         public int value;               // 操作数值
 
         // 对玩家目标执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             // 根据操作类型更新 selected_value
-            logic.GameData.selected_value = AddOrSet(logic.GameData.selected_value, oper, value);
+            logic.GameData.SetSelectedValue(AddOrSet(logic.GameData.Selection.SelectedValue, oper, value));
         }
 
         // 对卡牌目标执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             // 根据操作类型更新 selected_value
-            logic.GameData.selected_value = AddOrSet(logic.GameData.selected_value, oper, value);
+            logic.GameData.SetSelectedValue(AddOrSet(logic.GameData.Selection.SelectedValue, oper, value));
         }
 
     }

@@ -18,7 +18,7 @@ namespace TcgEngine
         public CardData transform_to; // 要转换成的卡牌数据
 
         // 对卡牌目标执行转换效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             logic.TransformCard(target, transform_to); // 执行卡牌转换
         }

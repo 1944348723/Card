@@ -15,7 +15,7 @@ namespace TcgEngine
     {
         public bool owner_opponent; // 是否将控制权转交给对手？true = 转给对手，false = 转给施法者
 
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             Game game = logic.GetGameData();  // 获取当前游戏数据
 

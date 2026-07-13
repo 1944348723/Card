@@ -12,7 +12,7 @@ namespace TcgEngine.Gameplay
 
         public void AttackCard(Card attacker, Card target, bool skipCost)
         {
-            if (!runtime.Game.CanAttackTarget(attacker, target, skipCost))
+            if (!runtime.Rules.CanAttackTarget(attacker, target, skipCost))
                 return;
 
             Player player = runtime.Game.GetPlayer(attacker.player_id);
@@ -20,10 +20,10 @@ namespace TcgEngine.Gameplay
                 player.AddHistory(GameAction.Attack, attacker, target);
 
             runtime.Game.last_target = target.uid;
-            runtime.Engine.TriggerCardAbilityType(AbilityTrigger.OnBeforeAttack, attacker, target);
-            runtime.Engine.TriggerCardAbilityType(AbilityTrigger.OnBeforeDefend, target, attacker);
-            runtime.Engine.TriggerSecrets(AbilityTrigger.OnBeforeAttack, attacker);
-            runtime.Engine.TriggerSecrets(AbilityTrigger.OnBeforeDefend, target);
+            runtime.Abilities.TriggerType(AbilityTrigger.OnBeforeAttack, attacker, target);
+            runtime.Abilities.TriggerType(AbilityTrigger.OnBeforeDefend, target, attacker);
+            runtime.Secrets.TriggerSecrets(AbilityTrigger.OnBeforeAttack, attacker);
+            runtime.Secrets.TriggerSecrets(AbilityTrigger.OnBeforeDefend, target);
 
             runtime.ResolveQueue.AddAttack(attacker, target, ResolveAttackCard, skipCost);
             runtime.ResolveQueue.ResolveAll();
@@ -33,15 +33,15 @@ namespace TcgEngine.Gameplay
         {
             if (attacker == null || target == null)
                 return;
-            if (!runtime.Game.CanAttackTarget(attacker, target, skipCost))
+            if (!runtime.Rules.CanAttackTarget(attacker, target, skipCost))
                 return;
 
             Player player = runtime.Game.GetPlayer(attacker.player_id);
             if (!runtime.IsAiSimulation)
                 player.AddHistory(GameAction.AttackPlayer, attacker, target);
 
-            runtime.Engine.TriggerSecrets(AbilityTrigger.OnBeforeAttack, attacker);
-            runtime.Engine.TriggerCardAbilityType(AbilityTrigger.OnBeforeAttack, attacker, target);
+            runtime.Secrets.TriggerSecrets(AbilityTrigger.OnBeforeAttack, attacker);
+            runtime.Abilities.TriggerType(AbilityTrigger.OnBeforeAttack, attacker, target);
 
             runtime.ResolveQueue.AddAttack(attacker, target, ResolveAttackPlayer, skipCost);
             runtime.ResolveQueue.ResolveAll();
@@ -88,9 +88,9 @@ namespace TcgEngine.Gameplay
             if (!runtime.Game.IsOnBoard(attacker) || !runtime.Game.IsOnBoard(target))
                 return;
 
-            runtime.Engine.onAttackStart?.Invoke(attacker, target);
+            runtime.Events.RaiseAttackStarted(attacker, target);
             attacker.RemoveStatus(StatusType.Stealth);
-            runtime.Engine.UpdateOngoings();
+            runtime.UpdateOngoings();
 
             runtime.ResolveQueue.AddAttack(attacker, target, ResolveAttackCardHit, skipCost);
             runtime.ResolveQueue.ResolveAll(0.3f);
@@ -101,28 +101,28 @@ namespace TcgEngine.Gameplay
             int attackerDamage = attacker.GetAttack();
             int defenderDamage = target.GetAttack();
 
-            runtime.Engine.DamageCard(attacker, target, attackerDamage, DamageType.Combat);
+            runtime.Damage.DamageCard(attacker, target, attackerDamage, DamageType.Combat);
             if (!attacker.HasStatus(StatusType.Intimidate))
-                runtime.Engine.DamageCard(target, attacker, defenderDamage, DamageType.Combat);
+                runtime.Damage.DamageCard(target, attacker, defenderDamage, DamageType.Combat);
 
             if (!skipCost)
                 Exhaust(attacker);
 
-            runtime.Engine.UpdateOngoings();
+            runtime.UpdateOngoings();
 
             bool attackerOnBoard = runtime.Game.IsOnBoard(attacker);
             bool defenderOnBoard = runtime.Game.IsOnBoard(target);
             if (attackerOnBoard)
-                runtime.Engine.TriggerCardAbilityType(AbilityTrigger.OnAfterAttack, attacker, target);
+                runtime.Abilities.TriggerType(AbilityTrigger.OnAfterAttack, attacker, target);
             if (defenderOnBoard)
-                runtime.Engine.TriggerCardAbilityType(AbilityTrigger.OnAfterDefend, target, attacker);
+                runtime.Abilities.TriggerType(AbilityTrigger.OnAfterDefend, target, attacker);
             if (attackerOnBoard)
-                runtime.Engine.TriggerSecrets(AbilityTrigger.OnAfterAttack, attacker);
+                runtime.Secrets.TriggerSecrets(AbilityTrigger.OnAfterAttack, attacker);
             if (defenderOnBoard)
-                runtime.Engine.TriggerSecrets(AbilityTrigger.OnAfterDefend, target);
+                runtime.Secrets.TriggerSecrets(AbilityTrigger.OnAfterDefend, target);
 
-            runtime.Engine.onAttackEnd?.Invoke(attacker, target);
-            runtime.Engine.RefreshData();
+            runtime.Events.RaiseAttackEnded(attacker, target);
+            runtime.Events.RaiseRefreshed();
             runtime.Flow.CheckForWinner();
             runtime.ResolveQueue.ResolveAll(0.2f);
         }
@@ -132,9 +132,9 @@ namespace TcgEngine.Gameplay
             if (!runtime.Game.IsOnBoard(attacker))
                 return;
 
-            runtime.Engine.onAttackPlayerStart?.Invoke(attacker, target);
+            runtime.Events.RaisePlayerAttackStarted(attacker, target);
             attacker.RemoveStatus(StatusType.Stealth);
-            runtime.Engine.UpdateOngoings();
+            runtime.UpdateOngoings();
 
             runtime.ResolveQueue.AddAttack(attacker, target, ResolveAttackPlayerHit, skipCost);
             runtime.ResolveQueue.ResolveAll(0.3f);
@@ -142,17 +142,17 @@ namespace TcgEngine.Gameplay
 
         private void ResolveAttackPlayerHit(Card attacker, Player target, bool skipCost)
         {
-            runtime.Engine.DamagePlayer(attacker, target, attacker.GetAttack(), DamageType.Combat);
+            runtime.Damage.DamagePlayer(attacker, target, attacker.GetAttack(), DamageType.Combat);
             if (!skipCost)
                 Exhaust(attacker);
 
-            runtime.Engine.UpdateOngoings();
+            runtime.UpdateOngoings();
             if (runtime.Game.IsOnBoard(attacker))
-                runtime.Engine.TriggerCardAbilityType(AbilityTrigger.OnAfterAttack, attacker, target);
-            runtime.Engine.TriggerSecrets(AbilityTrigger.OnAfterAttack, attacker);
+                runtime.Abilities.TriggerType(AbilityTrigger.OnAfterAttack, attacker, target);
+            runtime.Secrets.TriggerSecrets(AbilityTrigger.OnAfterAttack, attacker);
 
-            runtime.Engine.onAttackPlayerEnd?.Invoke(attacker, target);
-            runtime.Engine.RefreshData();
+            runtime.Events.RaisePlayerAttackEnded(attacker, target);
+            runtime.Events.RaiseRefreshed();
             runtime.Flow.CheckForWinner();
             runtime.ResolveQueue.ResolveAll(0.2f);
         }

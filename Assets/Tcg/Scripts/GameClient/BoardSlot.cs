@@ -33,7 +33,8 @@ namespace TcgEngine.Client
         private void Start()
         {
             // 检查 Slot 坐标是否在 Slot 系统允许的范围内
-            if (x < Slot.x_min || x > Slot.x_max || y < Slot.y_min || y > Slot.y_max)
+            BoardLayout board = GetBoardLayout();
+            if (x < board.MinX || x > board.MaxX || y < board.MinY || y > board.MaxY)
                 Debug.LogError("Board Slot X 和 Y 必须在 Slot.cs 设定的最小值和最大值之间，否则无效。");
         }
 
@@ -63,13 +64,13 @@ namespace TcgEngine.Client
             target_alpha = 0f;
 
             // 你的回合 + 正在拖拽可放置到棋盘的卡 + 该位置允许放置 → 高亮
-            if (your_turn && dcard != null && dcard.CardData.IsBoardCard() && gdata.CanPlayCard(dcard, slot))
+            if (your_turn && dcard != null && dcard.CardData.IsBoardCard() && GameClient.Get().Rules.CanPlayCard(dcard, slot))
             {
                 target_alpha = 1f; // 高亮：拖生物 / 装备
             }
 
             // 你的回合 + 拖拽需要目标的卡牌（例如法术）+ 该格子是合法目标 → 高亮
-            if (your_turn && dcard != null && dcard.CardData.IsRequireTarget() && gdata.CanPlayCard(dcard, slot))
+            if (your_turn && dcard != null && dcard.CardData.IsRequireTarget() && GameClient.Get().Rules.CanPlayCard(dcard, slot))
             {
                 target_alpha = 1f; // 高亮：拖目标法术
             }
@@ -94,10 +95,10 @@ namespace TcgEngine.Client
             Card select_card = bcard_selected?.GetCard();
 
             // 是否可以移动
-            bool can_do_move = your_turn && select_card != null && slot_card == null && gdata.CanMoveCard(select_card, slot);
+            bool can_do_move = your_turn && select_card != null && slot_card == null && GameClient.Get().Rules.CanMoveCard(select_card, slot);
 
             // 是否可以攻击
-            bool can_do_attack = your_turn && select_card != null && slot_card != null && gdata.CanAttackTarget(select_card, slot_card);
+            bool can_do_attack = your_turn && select_card != null && slot_card != null && GameClient.Get().Rules.CanAttackTarget(select_card, slot_card);
 
             // 只要可以移动或攻击 → 高亮
             if (can_do_attack || can_do_move)
@@ -120,7 +121,7 @@ namespace TcgEngine.Client
                 int pid = GameClient.Get().GetPlayerID();
                 int px = x;
                 if ((pid % 2) == 1)
-                    px = Slot.x_max - x + Slot.x_min; // 如果不是先手 → 镜像翻转 X
+                    px = GetBoardLayout().MirrorX(x); // 如果不是先手 → 镜像翻转 X
                 return new Slot(px, y, p);
             }
 
@@ -130,7 +131,7 @@ namespace TcgEngine.Client
                 int pid = GameClient.Get().GetPlayerID();
                 int py = y;
                 if ((pid % 2) == 1)
-                    py = Slot.y_max - y + Slot.y_min; // 镜像翻转 Y
+                    py = GetBoardLayout().MirrorY(y); // 镜像翻转 Y
                 return new Slot(x, py, p);
             }
 
@@ -143,6 +144,12 @@ namespace TcgEngine.Client
                 p = GameClient.Get().GetOpponentPlayerID();
            
             return new Slot(x, y, p); // 默认 Slot
+        }
+
+        private BoardLayout GetBoardLayout()
+        {
+            Game game = GameClient.Get()?.GetGameData();
+            return game?.Board ?? BoardLayout.Default;
         }
 
         /// <summary>

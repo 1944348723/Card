@@ -17,7 +17,7 @@ namespace TcgEngine
         public TraitData bonus_damage;   // 用于计算额外伤害的 Trait（卡或玩家拥有该 Trait 则提供伤害加成）
 
         // 对玩家造成伤害
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             // 计算最终伤害
             int damage = GetDamage(logic.GameData, caster, ability.value);
@@ -27,7 +27,7 @@ namespace TcgEngine
         }
 
         // 对卡牌造成伤害
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             // 计算最终伤害
             int damage = GetDamage(logic.GameData, caster, ability.value);

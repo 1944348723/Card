@@ -36,20 +36,20 @@ namespace TcgEngine.AI
             Player player = game_data.GetPlayer(player_id);
 
             // 如果轮到 AI 行动，并且 AI 当前不在执行动作
-            if (!is_playing && game_data.IsPlayerTurn(player))
+            if (!is_playing && gameplay.Rules.IsPlayerTurn(player))
             {
                 is_playing = true;
                 TimeTool.StartCoroutine(AiTurn()); // 启动协程执行 AI 回合
             }
 
             // 如果是选牌阶段（Mulligan）且 AI 不在行动，跳过 Mulligan
-            if (!is_playing && game_data.IsPlayerMulliganTurn(player))
+            if (!is_playing && gameplay.Rules.IsPlayerMulliganTurn(player))
             {
                 SkipMulligan();
             }
 
             // 如果轮到其他玩家，且 AI 还在运行，则停止 AI
-            if (!game_data.IsPlayerTurn(player) && ai_logic.IsRunning())
+            if (!gameplay.Rules.IsPlayerTurn(player) && ai_logic.IsRunning())
                 Stop();
         }
 

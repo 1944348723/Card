@@ -16,7 +16,7 @@ namespace TcgEngine
         public EffectStatType type;   // 要修改的属性类型（HP / Attack / Mana）
 
         // 对“玩家目标”生效的效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             Game data = logic.GetGameData();   // 获取当前游戏数据（里面存储骰子数值 rolled_value）
 
@@ -40,7 +40,7 @@ namespace TcgEngine
         }
 
         // 对“卡牌目标”生效的效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             Game data = logic.GetGameData();   // 获取骰子结果
 

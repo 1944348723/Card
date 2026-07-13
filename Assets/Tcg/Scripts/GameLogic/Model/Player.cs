@@ -71,29 +71,6 @@ namespace TcgEngine
 
         //---- 卡牌操作 -----
 
-        // 从所有卡组中移除卡牌
-        public virtual void RemoveCardFromAllGroups(Card card)
-        {
-            cards_deck.Remove(card);
-            cards_hand.Remove(card);
-            cards_board.Remove(card);
-            cards_equip.Remove(card);
-            cards_discard.Remove(card);
-            cards_secret.Remove(card);
-            cards_temp.Remove(card);
-            UnequipFromAllCards(card);
-        }
-
-        // 从所有卡牌中解除装备关系
-        public virtual void UnequipFromAllCards(Card equip)
-        {
-            foreach (Card card in cards_board)
-            {
-                if (card.equipped_uid == equip.uid)
-                    card.equipped_uid = null;
-            }
-        }
-
         // 从列表随机获取一张卡牌
         public virtual Card GetRandomCard(List<Card> card_list, System.Random rand)
         {
@@ -218,34 +195,34 @@ namespace TcgEngine
         //---- 槽位操作 -----
 
         // 获取随机槽位
-        public Slot GetRandomSlot(System.Random rand)
+        public Slot GetRandomSlot(BoardLayout board, System.Random rand)
         {
-            return Slot.GetRandom(player_id, rand);
+            return board.GetRandom(player_id, rand);
         }
 
         // 获取随机空槽位
-        public virtual Slot GetRandomEmptySlot(System.Random rand, List<Slot> list_mem = null)
+        public virtual Slot GetRandomEmptySlot(BoardLayout board, System.Random rand, List<Slot> list_mem = null)
         {
-            List<Slot> valid = GetEmptySlots(list_mem);
+            List<Slot> valid = GetEmptySlots(board, list_mem);
             if (valid.Count > 0)
                 return valid[rand.Next(0, valid.Count)];
             return Slot.None;
         }
 
         // 获取随机已占用槽位
-        public virtual Slot GetRandomOccupiedSlot(System.Random rand, List<Slot> list_mem = null)
+        public virtual Slot GetRandomOccupiedSlot(BoardLayout board, System.Random rand, List<Slot> list_mem = null)
         {
-            List<Slot> valid = GetOccupiedSlots(list_mem);
+            List<Slot> valid = GetOccupiedSlots(board, list_mem);
             if (valid.Count > 0)
                 return valid[rand.Next(0, valid.Count)];
             return Slot.None;
         }
 
         // 获取所有空槽位
-        public List<Slot> GetEmptySlots(List<Slot> list_mem = null)
+        public List<Slot> GetEmptySlots(BoardLayout board, List<Slot> list_mem = null)
         {
             List<Slot> valid = list_mem != null ? list_mem : new List<Slot>();
-            foreach (Slot slot in Slot.GetAll(player_id))
+            foreach (Slot slot in board.GetAll(player_id))
             {
                 Card slot_card = GetSlotCard(slot);
                 if (slot_card == null)
@@ -256,10 +233,10 @@ namespace TcgEngine
         }
 
         // 获取所有已占用槽位
-        public List<Slot> GetOccupiedSlots(List<Slot> list_mem = null)
+        public List<Slot> GetOccupiedSlots(BoardLayout board, List<Slot> list_mem = null)
         {
             List<Slot> valid = list_mem != null ? list_mem : new List<Slot>();
-            foreach (Slot slot in Slot.GetAll(player_id))
+            foreach (Slot slot in board.GetAll(player_id))
             {
                 Card slot_card = GetSlotCard(slot);
                 if (slot_card != null)
@@ -666,8 +643,17 @@ namespace TcgEngine
             dest.mana_max = source.mana_max;
             dest.kill_count = source.kill_count;
 
-            Card.CloneNull(source.hero, ref dest.hero); // 克隆英雄卡
             Card.CloneDict(source.cards_all, dest.cards_all); // 克隆卡牌字典
+
+            if (source.hero == null)
+            {
+                dest.hero = null;
+            }
+            else if (!dest.cards_all.TryGetValue(source.hero.uid, out dest.hero))
+            {
+                Card.CloneNull(source.hero, ref dest.hero);
+            }
+
             Card.CloneListRef(dest.cards_all, source.cards_board, dest.cards_board);
             Card.CloneListRef(dest.cards_all, source.cards_equip, dest.cards_equip);
             Card.CloneListRef(dest.cards_all, source.cards_hand, dest.cards_hand);
@@ -678,6 +664,8 @@ namespace TcgEngine
 
             CardStatus.CloneList(source.status, dest.status); // 克隆状态
             CardStatus.CloneList(source.ongoing_status, dest.ongoing_status);
+            CardTrait.CloneList(source.traits, dest.traits);
+            CardTrait.CloneList(source.ongoing_traits, dest.ongoing_traits);
         }
     }
     //---- 动作历史结构体 -----

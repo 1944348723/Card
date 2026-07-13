@@ -96,7 +96,7 @@ namespace TcgEngine.Gameplay
             if (!caster.CanDoAbilities())
                 return;
 
-            runtime.Engine.onAbilityStart?.Invoke(ability, caster);
+            runtime.Events.RaiseAbilityStarted(ability, caster);
             runtime.Game.ability_triggerer = triggerer.uid;
             runtime.Game.ability_played.Add(ability.id);
 
@@ -109,27 +109,27 @@ namespace TcgEngine.Gameplay
             ResolveSlotTargets(ability, caster);
             ResolveCardDataTargets(ability, caster);
             if (ability.target == AbilityTarget.None)
-                ability.DoEffects(runtime.Engine, caster);
+                ability.DoEffects(runtime.Effects, caster);
 
             Complete(ability, caster);
         }
 
         public void ResolveEffect(AbilityData ability, Card caster, Player target)
         {
-            ability.DoEffects(runtime.Engine, caster, target);
-            runtime.Engine.onAbilityTargetPlayer?.Invoke(ability, caster, target);
+            ability.DoEffects(runtime.Effects, caster, target);
+            runtime.Events.RaiseAbilityTargetedPlayer(ability, caster, target);
         }
 
         public void ResolveEffect(AbilityData ability, Card caster, Card target)
         {
-            ability.DoEffects(runtime.Engine, caster, target);
-            runtime.Engine.onAbilityTargetCard?.Invoke(ability, caster, target);
+            ability.DoEffects(runtime.Effects, caster, target);
+            runtime.Events.RaiseAbilityTargetedCard(ability, caster, target);
         }
 
         public void ResolveEffect(AbilityData ability, Card caster, Slot target)
         {
-            ability.DoEffects(runtime.Engine, caster, target);
-            runtime.Engine.onAbilityTargetSlot?.Invoke(ability, caster, target);
+            ability.DoEffects(runtime.Effects, caster, target);
+            runtime.Events.RaiseAbilityTargetedSlot(ability, caster, target);
         }
 
         public void Complete(AbilityData ability, Card caster)
@@ -141,7 +141,7 @@ namespace TcgEngine.Gameplay
                 caster.exhausted = caster.exhausted || ability.exhaust;
             }
 
-            runtime.Engine.UpdateOngoings();
+            runtime.UpdateOngoings();
             runtime.Flow.CheckForWinner();
 
             if (ability.target != AbilityTarget.ChoiceSelector && runtime.Game.state != GameState.GameEnded)
@@ -153,9 +153,9 @@ namespace TcgEngine.Gameplay
                 }
             }
 
-            runtime.Engine.onAbilityEnd?.Invoke(ability, caster);
+            runtime.Events.RaiseAbilityEnded(ability, caster);
             runtime.ResolveQueue.ResolveAll(0.5f);
-            runtime.Engine.RefreshData();
+            runtime.Events.RaiseRefreshed();
         }
 
         private bool BeginSelector(AbilityData ability, Card caster)
@@ -231,7 +231,7 @@ namespace TcgEngine.Gameplay
         {
             List<CardData> targets = ability.GetCardDataTargets(runtime.Game, caster, runtime.CardDataTargets);
             foreach (CardData target in targets)
-                ability.DoEffects(runtime.Engine, caster, target);
+                ability.DoEffects(runtime.Effects, caster, target);
         }
     }
 }

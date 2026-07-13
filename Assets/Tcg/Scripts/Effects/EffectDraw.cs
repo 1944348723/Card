@@ -16,13 +16,13 @@ namespace TcgEngine
     public class EffectDraw : EffectData
     {
         // 对玩家执行抽卡
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             logic.DrawCards(target, ability.value);  // 玩家抽 ability.value 张卡
         }
 
         // 对卡牌执行抽卡（抽卡归该卡所属玩家）
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             Player player = logic.GameData.GetPlayer(target.player_id); // 获取卡牌所属玩家
             logic.DrawCards(player, ability.value);                     // 玩家抽卡

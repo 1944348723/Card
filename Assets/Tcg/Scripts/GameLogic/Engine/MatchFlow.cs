@@ -44,7 +44,7 @@ namespace TcgEngine.Gameplay
                 player.mana = player.mana_max;
 
                 int cards = deck != null ? deck.start_cards : GameplayData.Get().cards_start;
-                runtime.Engine.DrawCards(player, cards);
+                runtime.Cards.DrawCards(player, cards);
 
                 bool isRandomFirstPlayer = level == null || level.first_player == LevelFirst.Random;
                 if (isRandomFirstPlayer
@@ -56,11 +56,11 @@ namespace TcgEngine.Gameplay
                 }
             }
 
-            runtime.Engine.RefreshData();
-            runtime.Engine.onGameStart?.Invoke();
+            runtime.Events.RaiseRefreshed();
+            runtime.Events.RaiseGameStarted();
 
             if (shouldMulligan)
-                runtime.Engine.BeginMulliganFromEngine();
+                runtime.Selection.BeginMulligan();
             else
                 StartTurn();
         }
@@ -72,12 +72,12 @@ namespace TcgEngine.Gameplay
 
             ClearTurnData();
             runtime.Game.phase = GamePhase.StartTurn;
-            runtime.Engine.RefreshData();
-            runtime.Engine.onTurnStart?.Invoke();
+            runtime.Events.RaiseRefreshed();
+            runtime.Events.RaiseTurnStarted();
 
             Player player = runtime.Game.GetActivePlayer();
             if (runtime.Game.turn_count > 1 || player.player_id != runtime.Game.first_player)
-                runtime.Engine.DrawCards(player, GameplayData.Get().cards_per_turn);
+                runtime.Cards.DrawCards(player, GameplayData.Get().cards_per_turn);
 
             player.mana_max += GameplayData.Get().mana_per_turn;
             player.mana_max = Mathf.Min(player.mana_max, GameplayData.Get().mana_max);
@@ -85,7 +85,7 @@ namespace TcgEngine.Gameplay
             runtime.Game.turn_timer = GameplayData.Get().turn_duration;
             player.history_list.Clear();
 
-            runtime.Engine.DamagePlayer(player, player.GetStatusValue(StatusType.Poisoned), DamageType.Status);
+            runtime.Damage.DamagePlayer(player, player.GetStatusValue(StatusType.Poisoned), DamageType.Status);
             player.hero?.Refresh();
 
             for (int i = player.cards_board.Count - 1; i >= 0; i--)
@@ -94,12 +94,12 @@ namespace TcgEngine.Gameplay
                 if (!card.HasStatus(StatusType.Sleep))
                     card.Refresh();
                 if (card.HasStatus(StatusType.Poisoned))
-                    runtime.Engine.DamageCard(card, card.GetStatusValue(StatusType.Poisoned), DamageType.Status);
+                    runtime.Damage.DamageCard(card, card.GetStatusValue(StatusType.Poisoned), DamageType.Status);
             }
 
-            runtime.Engine.UpdateOngoings();
-            runtime.Engine.TriggerPlayerCardsAbilityType(player, AbilityTrigger.StartOfTurn);
-            runtime.Engine.TriggerPlayerSecrets(player, AbilityTrigger.StartOfTurn);
+            runtime.UpdateOngoings();
+            runtime.Abilities.TriggerPlayerCards(player, AbilityTrigger.StartOfTurn);
+            runtime.Secrets.TriggerPlayerSecrets(player, AbilityTrigger.StartOfTurn);
             runtime.ResolveQueue.AddCallback(StartMainPhase);
             runtime.ResolveQueue.ResolveAll(0.2f);
         }
@@ -123,8 +123,8 @@ namespace TcgEngine.Gameplay
                 return;
 
             runtime.Game.phase = GamePhase.Main;
-            runtime.Engine.onTurnPlay?.Invoke();
-            runtime.Engine.RefreshData();
+            runtime.Events.RaiseMainPhaseStarted();
+            runtime.Events.RaiseRefreshed();
         }
 
         public void EndTurn()
@@ -132,7 +132,7 @@ namespace TcgEngine.Gameplay
             if (runtime.Game.state == GameState.GameEnded || runtime.Game.phase != GamePhase.Main)
                 return;
 
-            runtime.Game.selector = SelectorType.None;
+            runtime.Game.EndSelection();
             runtime.Game.phase = GamePhase.EndTurn;
 
             foreach (Player player in runtime.Game.players)
@@ -145,9 +145,9 @@ namespace TcgEngine.Gameplay
             }
 
             Player activePlayer = runtime.Game.GetActivePlayer();
-            runtime.Engine.TriggerPlayerCardsAbilityType(activePlayer, AbilityTrigger.EndOfTurn);
-            runtime.Engine.onTurnEnd?.Invoke();
-            runtime.Engine.RefreshData();
+            runtime.Abilities.TriggerPlayerCards(activePlayer, AbilityTrigger.EndOfTurn);
+            runtime.Events.RaiseTurnEnded();
+            runtime.Events.RaiseRefreshed();
             runtime.ResolveQueue.AddCallback(StartNextTurn);
             runtime.ResolveQueue.ResolveAll(0.2f);
         }
@@ -159,11 +159,11 @@ namespace TcgEngine.Gameplay
 
             runtime.Game.state = GameState.GameEnded;
             runtime.Game.phase = GamePhase.None;
-            runtime.Game.selector = SelectorType.None;
+            runtime.Game.ResetSelection();
             runtime.Game.current_player = winner;
             runtime.ResolveQueue.Clear();
-            runtime.Engine.onGameEnd?.Invoke(runtime.Game.GetPlayer(winner));
-            runtime.Engine.RefreshData();
+            runtime.Events.RaiseGameEnded(runtime.Game.GetPlayer(winner));
+            runtime.Events.RaiseRefreshed();
         }
 
         public void NextStep()
@@ -177,7 +177,7 @@ namespace TcgEngine.Gameplay
                 return;
             }
 
-            runtime.Engine.CancelSelection();
+            runtime.Selection.Cancel();
             runtime.ResolveQueue.AddCallback(EndTurn);
             runtime.ResolveQueue.ResolveAll();
         }
@@ -203,7 +203,7 @@ namespace TcgEngine.Gameplay
 
         private void ClearTurnData()
         {
-            runtime.Game.selector = SelectorType.None;
+            runtime.Game.ResetSelection();
             runtime.ResolveQueue.Clear();
             runtime.ClearTargetCaches();
             runtime.Game.last_played = null;
@@ -211,7 +211,6 @@ namespace TcgEngine.Gameplay
             runtime.Game.last_target = null;
             runtime.Game.last_summoned = null;
             runtime.Game.ability_triggerer = null;
-            runtime.Game.selected_value = 0;
             runtime.Game.ability_played.Clear();
             runtime.Game.cards_attacked.Clear();
         }

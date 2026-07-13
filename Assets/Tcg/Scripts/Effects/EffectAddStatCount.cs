@@ -15,7 +15,7 @@ namespace TcgEngine
     {
         [Header("属性类型")]
         public EffectStatType type; // 目标属性类型（攻击/生命/法力）
-        public PileType pile;       // 计算数量的牌堆类型
+        public CardZone pile;       // 计算数量的牌堆类型
 
         [Header("数量条件")]
         public CardType has_type;   // 仅计算指定卡牌类型
@@ -25,7 +25,7 @@ namespace TcgEngine
         /// <summary>
         /// 执行效果：作用于玩家属性
         /// </summary>
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             int val = GetCount(logic.GetGameData(), caster) * ability.value; // 计算数量乘以能力值
             if (type == EffectStatType.HP)
@@ -46,7 +46,7 @@ namespace TcgEngine
         /// <summary>
         /// 执行效果：作用于卡牌属性
         /// </summary>
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             int val = GetCount(logic.GetGameData(), caster) * ability.value;
             if (type == EffectStatType.Attack)
@@ -60,7 +60,7 @@ namespace TcgEngine
         /// <summary>
         /// 执行持续效果：作用于卡牌属性（持续生效）
         /// </summary>
-        public override void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoOngoingEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             int val = GetCount(logic.GetGameData(), caster) * ability.value;
             if (type == EffectStatType.Attack)
@@ -83,18 +83,18 @@ namespace TcgEngine
         /// <summary>
         /// 统计指定牌堆中符合条件的卡牌数量
         /// </summary>
-        private int CountPile(Player player, PileType pile)
+        private int CountPile(Player player, CardZone pile)
         {
             List<Card> card_pile = null;
 
             // 选择牌堆
-            if (pile == PileType.Hand) card_pile = player.cards_hand;
-            if (pile == PileType.Board) card_pile = player.cards_board;
-            if (pile == PileType.Equipped) card_pile = player.cards_equip;
-            if (pile == PileType.Deck) card_pile = player.cards_deck;
-            if (pile == PileType.Discard) card_pile = player.cards_discard;
-            if (pile == PileType.Secret) card_pile = player.cards_secret;
-            if (pile == PileType.Temp) card_pile = player.cards_temp;
+            if (pile == CardZone.Hand) card_pile = player.cards_hand;
+            if (pile == CardZone.Board) card_pile = player.cards_board;
+            if (pile == CardZone.Equip) card_pile = player.cards_equip;
+            if (pile == CardZone.Deck) card_pile = player.cards_deck;
+            if (pile == CardZone.Discard) card_pile = player.cards_discard;
+            if (pile == CardZone.Secret) card_pile = player.cards_secret;
+            if (pile == CardZone.Temp) card_pile = player.cards_temp;
 
             // 统计符合条件的卡牌数量
             if (card_pile != null)

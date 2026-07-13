@@ -79,8 +79,8 @@ namespace TcgEngine.Client
             Card select_card = bcard_selected?.GetCard();
             if (select_card != null)
             {
-                bool can_do_attack = gdata.IsPlayerActionTurn(player) && select_card.CanAttack();          // 当前卡是否能攻击
-                bool can_be_attacked = gdata.CanAttackTarget(select_card, oplayer);                        // 对手是否可以成为攻击目标
+                bool can_do_attack = GameClient.Get().Rules.IsPlayerActionTurn(player) && select_card.CanAttack(); // 当前卡是否能攻击
+                bool can_be_attacked = GameClient.Get().Rules.CanAttackTarget(select_card, oplayer); // 对手是否可以成为攻击目标
 
                 if (can_do_attack && can_be_attacked)
                 {
@@ -89,7 +89,8 @@ namespace TcgEngine.Client
             }
 
             // 拖拽需要目标的法术并且玩家可作为合法目标
-            if (your_turn && drag_card != null && drag_card.CardData.IsRequireTargetSpell() && gdata.IsPlayTargetValid(drag_card.GetCard(), GetPlayer()))
+            if (your_turn && drag_card != null && drag_card.CardData.IsRequireTargetSpell()
+                && GameClient.Get().Rules.IsPlayTargetValid(drag_card.GetCard(), GetPlayer()))
             {
                 target_alpha = 1f;
             }

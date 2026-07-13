@@ -25,7 +25,7 @@ namespace TcgEngine.Gameplay
                 runtime.ResolveQueue.AddSecret(triggerType, secret, secret, ResolveSecret);
                 runtime.ResolveQueue.SetDelay(0.5f);
                 secret.exhausted = true;
-                runtime.Engine.onSecretTrigger?.Invoke(secret, secret);
+                runtime.Events.RaiseSecretTriggered(secret, secret);
                 return true;
             }
 
@@ -57,7 +57,7 @@ namespace TcgEngine.Gameplay
                     runtime.ResolveQueue.AddSecret(triggerType, secret, trigger, ResolveSecret);
                     runtime.ResolveQueue.SetDelay(0.5f);
                     secret.exhausted = true;
-                    runtime.Engine.onSecretTrigger?.Invoke(secret, trigger);
+                    runtime.Events.RaiseSecretTriggered(secret, trigger);
                     return true;
                 }
             }
@@ -76,9 +76,9 @@ namespace TcgEngine.Gameplay
                 triggerOwner.AddHistory(GameAction.SecretTriggered, secret, triggerer);
             }
 
-            runtime.Engine.TriggerCardAbilityType(triggerType, secret, triggerer);
-            runtime.Engine.DiscardCard(secret);
-            runtime.Engine.onSecretResolve?.Invoke(secret, triggerer);
+            runtime.Abilities.TriggerType(triggerType, secret, triggerer);
+            runtime.Cards.Discard(secret);
+            runtime.Events.RaiseSecretResolved(secret, triggerer);
         }
     }
 }

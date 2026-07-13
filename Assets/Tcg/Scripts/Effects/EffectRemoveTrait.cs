@@ -17,13 +17,13 @@ namespace TcgEngine
         public TraitData trait;  // 要移除的特性数据
 
         // 对玩家目标执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             target.RemoveTrait(trait.id);  // 移除玩家身上的指定特性
         }
 
         // 对卡牌目标执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             target.RemoveTrait(trait.id);  // 移除卡牌身上的指定特性
         }

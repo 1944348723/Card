@@ -1,6 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
 using TcgEngine.Gameplay;
 
 namespace TcgEngine.AI
@@ -38,7 +35,7 @@ namespace TcgEngine.AI
             // AI 可以操作的条件：
             // 1. 当前轮到该玩家
             // 2. 或者正在进行初始选牌阶段（Mulligan）
-            bool can_play = game_data.IsPlayerTurn(player) || game_data.IsPlayerMulliganTurn(player);
+            bool can_play = gameplay.Rules.IsPlayerTurn(player) || gameplay.Rules.IsPlayerMulliganTurn(player);
 
             // 同时要求游戏当前不在解决其他动作中
             return can_play && !gameplay.IsResolving();

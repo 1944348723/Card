@@ -88,7 +88,7 @@ namespace TcgEngine.UI
         {
             Game gdata = GameClient.Get().GetGameData();
             Player player = GameClient.Get().GetPlayer();
-            return gdata.IsPlayerMulliganTurn(player);   // 当前玩家是否处于Mulligan阶段
+            return GameClient.Get().Rules.IsPlayerMulliganTurn(player); // 当前玩家是否处于Mulligan阶段
         }
 
         /// <summary>

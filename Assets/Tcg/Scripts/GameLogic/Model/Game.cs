@@ -6,6 +6,10 @@ namespace TcgEngine
     [System.Serializable]
     public class Game
     {
+        [System.NonSerialized] private BoardLayout board;
+
+        public BoardLayout Board => board ??= BoardLayout.CreateDefault(players?.Length ?? 2);
+
         public string game_uid;           // 游戏唯一ID
         public GameSettings settings;     // 游戏设置（规则、玩家数量等）
 
@@ -36,6 +40,37 @@ namespace TcgEngine
         public int rolled_value;           // 骰子结果
         public int selected_value;         // 玩家选择的值（比如选择器）
 
+        // 扁平字段继续作为网络/存档格式；规则层通过快照读取完整选择上下文。
+        public SelectionState Selection => new(
+            selector, selector_player_id, selector_ability_id, selector_caster_uid, selected_value);
+
+        public void BeginSelection(SelectorType type, int playerId, string abilityId, string casterUid)
+        {
+            selector = type;
+            selector_player_id = playerId;
+            selector_ability_id = abilityId;
+            selector_caster_uid = casterUid;
+        }
+
+        public void EndSelection()
+        {
+            selector = SelectorType.None;
+        }
+
+        public void SetSelectedValue(int value)
+        {
+            selected_value = value;
+        }
+
+        public void ResetSelection()
+        {
+            selector = SelectorType.None;
+            selector_player_id = 0;
+            selector_ability_id = null;
+            selector_caster_uid = null;
+            selected_value = 0;
+        }
+
         // 其他引用集合
         public HashSet<string> ability_played = new(); // 已触发技能集合
         public HashSet<string> cards_attacked = new(); // 已攻击卡牌集合
@@ -52,6 +87,7 @@ namespace TcgEngine
                 players[i] = new Player(i);
             }
             settings = GameSettings.Default;
+            board = BoardLayout.CreateDefault(nb_players);
         }
 
         // 判断是否所有玩家准备就绪
@@ -78,90 +114,6 @@ namespace TcgEngine
                 }
             }
             return true;
-        }
-
-        // 检查是否轮到玩家行动（包括常规操作和选择器）
-        public virtual bool IsPlayerTurn(Player player)
-        {
-            return Gameplay.RuleValidator.IsPlayerTurn(this, player);
-        }
-
-        // 检查玩家是否轮到常规操作（打牌、攻击、技能）
-        public virtual bool IsPlayerActionTurn(Player player)
-        {
-            return Gameplay.RuleValidator.IsPlayerActionTurn(this, player);
-        }
-
-        // 检查玩家是否轮到选择器操作（技能目标选择等）
-        public virtual bool IsPlayerSelectorTurn(Player player)
-        {
-            return Gameplay.RuleValidator.IsPlayerSelectorTurn(this, player);
-        }
-
-        // 检查玩家是否轮到换牌（Mulligan）
-        public virtual bool IsPlayerMulliganTurn(Player player)
-        {
-            return Gameplay.RuleValidator.IsPlayerMulliganTurn(this, player);
-        }
-
-        // 检查玩家是否可以打出卡牌到指定槽位
-        public virtual bool CanPlayCard(Card card, Slot slot, bool skip_cost = false)
-        {
-            return Gameplay.RuleValidator.CanPlayCard(this, card, slot, skip_cost);
-        }
-
-        // 检查卡牌是否允许移动到指定槽位
-        public virtual bool CanMoveCard(Card card, Slot slot, bool skip_cost = false)
-        {
-            return Gameplay.RuleValidator.CanMoveCard(this, card, slot, skip_cost);
-        }
-
-        // 检查卡牌是否允许攻击玩家
-        public virtual bool CanAttackTarget(Card attacker, Player target, bool skip_cost = false)
-        {
-            return Gameplay.RuleValidator.CanAttackTarget(this, attacker, target, skip_cost);
-        }
-
-        // 检查卡牌是否允许攻击另一张卡
-        public virtual bool CanAttackTarget(Card attacker, Card target, bool skip_cost = false)
-        {
-            return Gameplay.RuleValidator.CanAttackTarget(this, attacker, target, skip_cost);
-        }
-
-        // 检查卡牌是否可以施放技能（主动技能）
-        public virtual bool CanCastAbility(Card card, AbilityData ability)
-        {
-            return Gameplay.RuleValidator.CanCastAbility(this, card, ability);
-        }
-
-        // 检查玩家选择技能是否可用（选择器）
-        public virtual bool CanSelectAbility(Card card, AbilityData ability)
-        {
-            return Gameplay.RuleValidator.CanSelectAbility(this, card, ability);
-        }
-
-        // 检查卡牌的OnPlay技能是否触发
-        public virtual bool CanAnyPlayAbilityTrigger(Card card)
-        {
-            return Gameplay.RuleValidator.CanAnyPlayAbilityTrigger(this, card);
-        }
-
-        // 检查法术或技能的目标是否合法（拖动到玩家）
-        public virtual bool IsPlayTargetValid(Card caster, Player target)
-        {
-            return Gameplay.RuleValidator.IsPlayTargetValid(this, caster, target);
-        }
-
-        // 检查卡牌是否可以作为目标被施法（用于需要拖到另一张卡的法术）
-        public virtual bool IsPlayTargetValid(Card caster, Card target)
-        {
-            return Gameplay.RuleValidator.IsPlayTargetValid(this, caster, target);
-        }
-
-        // 检查槽位是否可以作为目标被施法（用于需要拖到槽位的法术）
-        public virtual bool IsPlayTargetValid(Card caster, Slot target)
-        {
-            return Gameplay.RuleValidator.IsPlayTargetValid(this, caster, target);
         }
 
         // 根据玩家ID获取玩家对象
@@ -313,8 +265,9 @@ namespace TcgEngine
         // 随机获取一个玩家
         public virtual Player GetRandomPlayer(System.Random rand)
         {
-            Player player = GetPlayer(rand.NextDouble() < 0.5 ? 1 : 0); // 以50%概率选择玩家0或1
-            return player;
+            if (players == null || players.Length == 0)
+                return null;
+            return players[rand.Next(players.Length)];
         }
 
         // 随机获取场上的一张卡牌
@@ -327,8 +280,7 @@ namespace TcgEngine
         // 随机获取一个槽位
         public virtual Slot GetRandomSlot(System.Random rand)
         {
-            Player player = GetRandomPlayer(rand);
-            return player.GetRandomSlot(rand); // 从该玩家可用槽位中随机选择
+            return Board.GetRandom(rand);
         }
 
         // 判断卡牌是否在手牌中
@@ -404,6 +356,7 @@ namespace TcgEngine
         {
             dest.game_uid = source.game_uid;
             dest.settings = source.settings;
+            dest.board = source.Board;
 
             dest.first_player = source.first_player;
             dest.current_player = source.current_player;
@@ -413,10 +366,16 @@ namespace TcgEngine
             dest.phase = source.phase;
 
             // 初始化玩家数组
-            if (dest.players == null)
+            if (dest.players == null || dest.players.Length != source.players.Length)
             {
                 dest.players = new Player[source.players.Length];
                 for(int i=0; i< source.players.Length; i++)
+                    dest.players[i] = new Player(i);
+            }
+
+            for (int i = 0; i < dest.players.Length; i++)
+            {
+                if (dest.players[i] == null)
                     dest.players[i] = new Player(i);
             }
 

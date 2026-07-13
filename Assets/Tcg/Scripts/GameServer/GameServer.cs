@@ -303,7 +303,7 @@ namespace TcgEngine.Server
             MsgPlayCard msg = sdata.Get<MsgPlayCard>();
             Player player = GetPlayer(iclient);
             // 必须：玩家存在 + 消息有效 + 当前轮到该玩家行动 + 不能在结算中
-            if (player != null && msg != null && game_data.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
             {
                 Card card = player.GetCard(msg.card_uid);
                 // 校验卡牌存在且属于该玩家，防止作弊
@@ -317,7 +317,7 @@ namespace TcgEngine.Server
         {
             MsgAttack msg = sdata.Get<MsgAttack>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
             {
                 Card attacker = player.GetCard(msg.attacker_uid);
                 Card target = game_data.GetCard(msg.target_uid);
@@ -334,7 +334,7 @@ namespace TcgEngine.Server
         {
             MsgAttackPlayer msg = sdata.Get<MsgAttackPlayer>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
             {
                 Card attacker = player.GetCard(msg.attacker_uid);
                 Player target = game_data.GetPlayer(msg.target_id);
@@ -350,7 +350,7 @@ namespace TcgEngine.Server
         {
             MsgPlayCard msg = sdata.Get<MsgPlayCard>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
             {
                 Card card = player.GetCard(msg.card_uid);
                 if (card != null && card.player_id == player.player_id)
@@ -363,7 +363,7 @@ namespace TcgEngine.Server
         {
             MsgCastAbility msg = sdata.Get<MsgCastAbility>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
             {
                 Card card = player.GetCard(msg.caster_uid);
                 AbilityData iability = AbilityData.Get(msg.ability_id);
@@ -377,7 +377,7 @@ namespace TcgEngine.Server
         {
             MsgCard msg = sdata.Get<MsgCard>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
             {
                 Card target = game_data.GetCard(msg.card_uid);
                 gameplay.SelectCard(target);
@@ -389,7 +389,7 @@ namespace TcgEngine.Server
         {
             MsgPlayer msg = sdata.Get<MsgPlayer>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
             {
                 Player target = game_data.GetPlayer(msg.player_id);
                 gameplay.SelectPlayer(target);
@@ -401,10 +401,10 @@ namespace TcgEngine.Server
         {
             Slot slot = sdata.Get<Slot>();
             Player player = GetPlayer(iclient);
-            if (player != null && game_data.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            if (player != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
             {
                 // slot 校验有效性
-                if(slot != null && slot.IsBoardSlot())
+                if(game_data.Board.Contains(slot))
                     gameplay.SelectSlot(slot);
             }
         }
@@ -414,7 +414,7 @@ namespace TcgEngine.Server
         {
             MsgInt msg = sdata.Get<MsgInt>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
             {
                 gameplay.SelectChoice(msg.value);
             }
@@ -425,7 +425,7 @@ namespace TcgEngine.Server
         {
             MsgInt msg = sdata.Get<MsgInt>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
             {
                 gameplay.SelectCost(msg.value);
             }
@@ -435,7 +435,7 @@ namespace TcgEngine.Server
         public void ReceiveCancelSelection(ClientData iclient, SerializedData sdata)
         {
             Player player = GetPlayer(iclient);
-            if (player != null && game_data.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            if (player != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
             {
                 gameplay.CancelSelection();
             }
@@ -446,7 +446,7 @@ namespace TcgEngine.Server
         {
             MsgMulligan msg = sdata.Get<MsgMulligan>();
             Player player = GetPlayer(iclient);
-            if (player != null && msg != null && game_data.IsPlayerMulliganTurn(player) && !gameplay.IsResolving())
+            if (player != null && msg != null && gameplay.Rules.IsPlayerMulliganTurn(player) && !gameplay.IsResolving())
             {
                 gameplay.Mulligan(player, msg.cards);
             }
@@ -456,7 +456,7 @@ namespace TcgEngine.Server
         public void ReceiveEndTurn(ClientData iclient, SerializedData sdata)
         {
             Player player = GetPlayer(iclient);
-            if (player != null && game_data.IsPlayerTurn(player))
+            if (player != null && gameplay.Rules.IsPlayerTurn(player))
             {
                 gameplay.NextStep();
             }

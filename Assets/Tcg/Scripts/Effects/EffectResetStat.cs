@@ -15,7 +15,7 @@ namespace TcgEngine
     public class EffectResetStat : EffectData
     {
         // 对卡牌执行重置效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             target.SetCard(target.CardData, target.VariantData);  // 重置卡牌属性为原始值
         }

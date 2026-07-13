@@ -19,7 +19,7 @@ namespace TcgEngine
         public bool increase_max;    // 是否增加最大法力值
 
         // 对玩家执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             // 增加最大法力值
             if (increase_max)

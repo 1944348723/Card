@@ -16,7 +16,7 @@ namespace TcgEngine
     public class EffectShuffle : EffectData
     {
         // 对玩家执行洗牌效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             logic.ShuffleDeck(target.cards_deck); // 洗牌
         }

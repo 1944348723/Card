@@ -290,7 +290,7 @@ namespace TcgEngine.Client
                 return;
             }
 
-            if (gdata.CanPlayCard(card, slot, true))
+            if (GameClient.Get().Rules.CanPlayCard(card, slot, true))
             {
                 PlayCard(slot);
             }

@@ -18,19 +18,19 @@ namespace TcgEngine
         public int dice = 6;  // 骰子面数，默认 6
 
         // 对卡牌目标执行投骰子
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             logic.RollRandomValue(dice);  // 生成随机值
         }
 
         // 对玩家目标执行投骰子
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             logic.RollRandomValue(dice);  // 生成随机值
         }
 
         // 对指定槽位执行投骰子（Slot）
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Slot target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Slot target)
         {
             logic.RollRandomValue(dice);  // 生成随机值
         }

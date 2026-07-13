@@ -12,8 +12,7 @@ namespace TcgEngine.Gameplay
 
         public void SetDeck(Player player, DeckData deck)
         {
-            player.cards_all.Clear();
-            player.cards_deck.Clear();
+            ClearCards(player);
             player.deck = deck.id;
             player.hero = null;
 
@@ -44,8 +43,7 @@ namespace TcgEngine.Gameplay
 
         public void SetDeck(Player player, UserDeckData deck)
         {
-            player.cards_all.Clear();
-            player.cards_deck.Clear();
+            ClearCards(player);
             player.deck = deck.tid;
             player.hero = null;
 
@@ -69,6 +67,19 @@ namespace TcgEngine.Gameplay
             }
 
             runtime.Cards.ShuffleDeck(player.cards_deck, runtime.Random);
+        }
+
+        private static void ClearCards(Player player)
+        {
+            player.cards_all.Clear();
+            player.cards_deck.Clear();
+            player.cards_hand.Clear();
+            player.cards_board.Clear();
+            player.cards_equip.Clear();
+            player.cards_discard.Clear();
+            player.cards_secret.Clear();
+            player.cards_temp.Clear();
+            player.hero = null;
         }
     }
 }

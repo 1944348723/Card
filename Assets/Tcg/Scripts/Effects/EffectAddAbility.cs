@@ -23,7 +23,7 @@ namespace TcgEngine
         /// <param name="ability">触发该效果的能力数据</param>
         /// <param name="caster">施放效果的卡牌</param>
         /// <param name="target">目标卡牌</param>
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             target.AddAbility(gain_ability); // 将指定能力添加到目标卡牌
         }
@@ -35,7 +35,7 @@ namespace TcgEngine
         /// <param name="ability">触发该效果的能力数据</param>
         /// <param name="caster">施放效果的卡牌</param>
         /// <param name="target">目标卡牌</param>
-        public override void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoOngoingEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             target.AddOngoingAbility(gain_ability); // 将能力添加为持续效果
         }

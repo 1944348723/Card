@@ -8,15 +8,14 @@ namespace TcgEngine.Gameplay
     /// </summary>
     public sealed class GameRuntime
     {
-        public GameLogic Engine { get; }
         public Game Game { get; private set; }
+        public BoardLayout Board => Game.Board;
         public ResolveQueue ResolveQueue { get; }
         public bool IsAiSimulation { get; }
         public Random Random { get; }
 
         public CardZoneManager Zones { get; }
         public CardLifecycle Cards { get; }
-        public HealthResolver Health { get; }
         public OngoingResolver Ongoings { get; }
         public SecretResolver Secrets { get; }
         public CombatResolver Combat { get; }
@@ -26,6 +25,9 @@ namespace TcgEngine.Gameplay
         public ActionExecutor Actions { get; }
         public DamageResolver Damage { get; }
         public DeckBuilder Decks { get; }
+        public GameRules Rules { get; }
+        public GameRuntimeEvents Events { get; } = new();
+        public EffectContext Effects { get; }
 
         public ListSwap<Card> CardTargets { get; } = new();
         public ListSwap<Player> PlayerTargets { get; } = new();
@@ -33,14 +35,13 @@ namespace TcgEngine.Gameplay
         public ListSwap<CardData> CardDataTargets { get; } = new();
         public List<Card> CardsToClear { get; } = new();
 
-        public GameRuntime(GameLogic engine, Game game, bool isAiSimulation, Random random = null)
+        public GameRuntime(Game game, bool isAiSimulation, Random random = null)
         {
-            Engine = engine ?? throw new ArgumentNullException(nameof(engine));
             ResolveQueue = new ResolveQueue(game, isAiSimulation);
             IsAiSimulation = isAiSimulation;
             Random = random ?? new Random();
-            Zones = new CardZoneManager();
-            Health = new HealthResolver();
+            Rules = new GameRules(game);
+            Zones = new CardZoneManager(this);
             Cards = new CardLifecycle(this);
             Ongoings = new OngoingResolver(this);
             Secrets = new SecretResolver(this);
@@ -51,6 +52,7 @@ namespace TcgEngine.Gameplay
             Actions = new ActionExecutor(this);
             Damage = new DamageResolver(this);
             Decks = new DeckBuilder(this);
+            Effects = new EffectContext(this);
             SetData(game);
         }
 
@@ -58,6 +60,7 @@ namespace TcgEngine.Gameplay
         {
             Game = game;
             ResolveQueue.SetData(game);
+            Rules.SetData(game);
         }
 
         public void ClearTargetCaches()
@@ -66,6 +69,12 @@ namespace TcgEngine.Gameplay
             PlayerTargets.Clear();
             SlotTargets.Clear();
             CardDataTargets.Clear();
+        }
+
+        public void UpdateOngoings()
+        {
+            Ongoings.UpdateOngoings();
+            Cards.CleanupInvalidCards(CardsToClear);
         }
     }
 }

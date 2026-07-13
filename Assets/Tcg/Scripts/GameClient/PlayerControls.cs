@@ -59,7 +59,7 @@ namespace TcgEngine.Client
             Card card = bcard.GetFocusCard();
 
             // 如果当前是选择目标阶段，并且玩家正在操作
-            if (gdata.IsPlayerSelectorTurn(player) && gdata.selector == SelectorType.SelectTarget)
+            if (GameClient.Get().Rules.IsPlayerSelectorTurn(player) && gdata.selector == SelectorType.SelectTarget)
             {
                 if (!Tutorial.Get().CanDo(TutoEndTrigger.SelectTarget, card))
                     return;
@@ -68,7 +68,7 @@ namespace TcgEngine.Client
                 GameClient.Get().SelectCard(card);
             }
             // 如果是行动阶段，并且卡牌属于玩家
-            else if (gdata.IsPlayerActionTurn(player) && card.player_id == player.player_id)
+            else if (GameClient.Get().Rules.IsPlayerActionTurn(player) && card.player_id == player.player_id)
             {
                 // 开始拖动卡牌
                 selected_card = bcard;

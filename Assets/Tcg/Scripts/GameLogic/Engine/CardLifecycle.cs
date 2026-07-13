@@ -37,7 +37,7 @@ namespace TcgEngine.Gameplay
                 if (player.cards_deck.Count == 0)   break;
                 if (player.cards_hand.Count >= GameplayData.Get().cards_max)    break;
 
-                zones.MoveTo(player, player.cards_deck[0], CardZone.Hand);
+                zones.MoveTo(player.cards_deck[0], CardZone.Hand);
                 drawn++;
             }
 
@@ -50,7 +50,7 @@ namespace TcgEngine.Gameplay
             if (player == null || data == null || variant == null) return null;
 
             Card card = Card.Create(data, variant, player);
-            zones.MoveTo(player, card, CardZone.Hand);
+            zones.MoveTo(card, CardZone.Hand);
             game.last_summoned = card.uid;
             return card;
         }
@@ -63,7 +63,7 @@ namespace TcgEngine.Gameplay
             {
                 if (player.cards_hand.Count <= 0) break;
 
-                zones.MoveTo(player, player.cards_hand[0], CardZone.Discard);
+                zones.MoveTo(player.cards_hand[0], CardZone.Discard);
             }
         }
 
@@ -75,7 +75,7 @@ namespace TcgEngine.Gameplay
             Player player = game.GetPlayer(bearer.player_id);
             Card old = Unequip(bearer);
 
-            zones.MoveTo(player, equipment, CardZone.Equip);
+            zones.MoveTo(equipment, CardZone.Equip);
             bearer.equipped_uid = equipment.uid;
             equipment.slot = bearer.slot;
 
@@ -99,12 +99,7 @@ namespace TcgEngine.Gameplay
         {
             if (card == null || owner == null || card.player_id == owner.player_id) return;
 
-            Player oldOwner = game.GetPlayer(card.player_id);
-            oldOwner.RemoveCardFromAllGroups(card);
-            oldOwner.cards_all.Remove(card.uid);
-
-            owner.cards_all[card.uid] = card;
-            card.player_id = owner.player_id;
+            zones.TransferOwnership(card, owner);
         }
         
         // 杀掉HP为0的卡牌
@@ -116,7 +111,7 @@ namespace TcgEngine.Gameplay
                 {
                     if (i < player.cards_board.Count && player.cards_board[i].GetHP() <= 0)
                     {
-                        runtime.Engine.DiscardCard(player.cards_board[i]);
+                        Discard(player.cards_board[i]);
                     }
                 }
 
@@ -128,7 +123,7 @@ namespace TcgEngine.Gameplay
                     Card card = player.cards_equip[i];
                     if (card.GetHP() <= 0 || player.GetBearerCard(card) == null)
                     {
-                        runtime.Engine.DiscardCard(card);
+                        Discard(card);
                     }
                 }
             }
@@ -142,19 +137,19 @@ namespace TcgEngine.Gameplay
 
         public Card Summon(Player player, CardData data, VariantData variant, Slot slot)
         {
-            if (!slot.IsBoardSlot() || game.HasCardOnSlot(slot))
+            if (!game.Board.Contains(slot) || game.HasCardOnSlot(slot))
                 return null;
 
             Card card = CreateInHand(player, data, variant);
-            runtime.Engine.PlayCard(card, slot, true);
-            runtime.Engine.onCardSummoned?.Invoke(card, slot);
+            runtime.Actions.PlayCard(card, slot, true);
+            runtime.Events.RaiseCardSummoned(card, slot);
             return card;
         }
 
         public Card Transform(Card card, CardData transformTo)
         {
             card.SetCard(transformTo, card.VariantData);
-            runtime.Engine.onCardTransformed?.Invoke(card);
+            runtime.Events.RaiseCardTransformed(card);
             return card;
         }
 
@@ -198,7 +193,7 @@ namespace TcgEngine.Gameplay
             bool wasOnBoard = game.IsOnBoard(card) || game.IsEquipped(card);
             UnequipAndDiscard(card);
 
-            zones.MoveTo(player, card, CardZone.Discard);
+            zones.MoveTo(card, CardZone.Discard);
             game.last_destroyed = card.uid;
 
             Card bearer = player.GetBearerCard(card);
@@ -214,7 +209,7 @@ namespace TcgEngine.Gameplay
             }
 
             runtime.CardsToClear.Add(card);
-            runtime.Engine.onCardDiscarded?.Invoke(card);
+            runtime.Events.RaiseCardDiscarded(card);
         }
     }
 }

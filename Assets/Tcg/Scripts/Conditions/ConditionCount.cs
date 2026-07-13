@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TcgEngine.Gameplay;
 
 namespace TcgEngine
 {
@@ -27,7 +28,7 @@ namespace TcgEngine
         public ConditionPlayerType target;
 
         // 要统计的牌堆类型
-        public PileType pile;
+        public CardZone pile;
 
         // 数值比较运算符（大于/小于/等于等）
         public ConditionOperatorInt oper;
@@ -77,24 +78,24 @@ namespace TcgEngine
         /// <summary>
         /// 统计指定玩家的指定牌堆中符合条件的卡牌数量
         /// </summary>
-        private int CountPile(Player player, PileType pile)
+        private int CountPile(Player player, CardZone pile)
         {
             List<Card> card_pile = null;
 
             // 获取指定牌堆
-            if (pile == PileType.Hand)
+            if (pile == CardZone.Hand)
                 card_pile = player.cards_hand;
-            if (pile == PileType.Board)
+            if (pile == CardZone.Board)
                 card_pile = player.cards_board;
-            if (pile == PileType.Equipped)
+            if (pile == CardZone.Equip)
                 card_pile = player.cards_equip;
-            if (pile == PileType.Deck)
+            if (pile == CardZone.Deck)
                 card_pile = player.cards_deck;
-            if (pile == PileType.Discard)
+            if (pile == CardZone.Discard)
                 card_pile = player.cards_discard;
-            if (pile == PileType.Secret)
+            if (pile == CardZone.Secret)
                 card_pile = player.cards_secret;
-            if (pile == PileType.Temp)
+            if (pile == CardZone.Temp)
                 card_pile = player.cards_temp;
 
             // 统计符合条件的卡牌数量

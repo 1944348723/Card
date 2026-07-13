@@ -15,7 +15,7 @@ namespace TcgEngine
         /// - 如果目标卡不是装备卡，则丢弃它所装备的装备卡（根据 equipped_uid 查找）。
         /// </summary>
 
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             // 如果目标卡是装备卡
             if (target.CardData.IsEquipment())

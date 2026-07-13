@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using Unity.Netcode;
 using System.Threading.Tasks;
+using TcgEngine.Gameplay;
 
 namespace TcgEngine.Client
 {
@@ -64,6 +65,7 @@ namespace TcgEngine.Client
 
         private int player_id = 0;        // 当前设备所控制的玩家ID
         private Game game_data;           // 当前游戏数据
+        private readonly GameRules rules = new GameRules(null);
 
         private bool observe_mode = false;  // 是否观战模式
         private int observe_player_id = 0;  // 观战目标
@@ -459,6 +461,7 @@ namespace TcgEngine.Client
             MsgAfterConnected msg = sdata.Get<MsgAfterConnected>();
             player_id = msg.player_id;        // 本地玩家ID
             game_data = msg.game_data;        // 游戏数据
+            rules.SetData(game_data);
             observe_mode = player_id < 0;     // 如果返回 -1，通常表示是观战模式
 
             if (observe_mode)
@@ -677,6 +680,7 @@ namespace TcgEngine.Client
         {
             MsgRefreshAll msg = sdata.Get<MsgRefreshAll>();
             game_data = msg.game_data; // 刷新游戏数据
+            rules.SetData(game_data);
             onRefreshAll?.Invoke();    // 触发刷新回调
         }
 
@@ -715,7 +719,7 @@ namespace TcgEngine.Client
         {
             Game game_data = GetGameData();
             Player player = GetPlayer();
-            return IsReady() && game_data.IsPlayerTurn(player); // 判断是否轮到本地玩家操作
+            return IsReady() && rules.IsPlayerTurn(player); // 判断是否轮到本地玩家操作
         }
 
         public bool IsObserveMode()
@@ -727,6 +731,8 @@ namespace TcgEngine.Client
         {
             return game_data; // 获取当前游戏数据
         }
+
+        public GameRules Rules => rules;
 
         public bool HasEnded()
         {

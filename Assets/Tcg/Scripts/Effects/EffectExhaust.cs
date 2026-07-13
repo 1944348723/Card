@@ -18,7 +18,7 @@ namespace TcgEngine
         public bool exhausted;  // 设置卡牌是否进入已用状态（true = 已用，false = 解除已用）
 
         // 对卡牌执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             target.exhausted = exhausted;  // 改变目标卡牌的已用状态
         }

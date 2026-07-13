@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TcgEngine.Gameplay;
 
 namespace TcgEngine
 {
@@ -13,7 +14,7 @@ namespace TcgEngine
     {
         [Header("Card is in pile")]
         // 要匹配的牌堆类型
-        public PileType type;
+        public CardZone type;
 
         // 布尔比较运算符（等于/不等于）
         public ConditionOperatorBool oper;
@@ -32,37 +33,37 @@ namespace TcgEngine
                 return false; // 目标为空，不满足条件
 
             // 根据指定牌堆类型检查卡牌位置
-            if (type == PileType.Hand)
+            if (type == CardZone.Hand)
             {
                 return CompareBool(data.IsInHand(target), oper);
             }
 
-            if (type == PileType.Board)
+            if (type == CardZone.Board)
             {
                 return CompareBool(data.IsOnBoard(target), oper);
             }
 
-            if (type == PileType.Equipped)
+            if (type == CardZone.Equip)
             {
                 return CompareBool(data.IsEquipped(target), oper);
             }
 
-            if (type == PileType.Deck)
+            if (type == CardZone.Deck)
             {
                 return CompareBool(data.IsInDeck(target), oper);
             }
 
-            if (type == PileType.Discard)
+            if (type == CardZone.Discard)
             {
                 return CompareBool(data.IsInDiscard(target), oper);
             }
 
-            if (type == PileType.Secret)
+            if (type == CardZone.Secret)
             {
                 return CompareBool(data.IsInSecret(target), oper);
             }
 
-            if (type == PileType.Temp)
+            if (type == CardZone.Temp)
             {
                 return CompareBool(data.IsInTemp(target), oper);
             }
@@ -84,7 +85,7 @@ namespace TcgEngine
         public override bool IsTargetConditionMet(Game data, AbilityData ability, Card caster, Slot target)
         {
             // 卡槽总是在场上，因此只有匹配 Board 时返回 true
-            return type == PileType.Board && target != Slot.None;
+            return type == CardZone.Board && target != Slot.None;
         }
     }
 }

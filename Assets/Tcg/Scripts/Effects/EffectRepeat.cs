@@ -19,7 +19,7 @@ namespace TcgEngine
         public EffectRepeatType type;       // 重复次数的类型（固定值或选择值）
 
         // 无目标版本
-        public override void DoEffect(GameLogic logic, AbilityData iability, Card caster)
+        public override void DoEffect(EffectContext logic, AbilityData iability, Card caster)
         {
             int count = GetRepeatCount(logic.GameData, iability); // 获取重复次数
             for (int i = 0; i < count; i++)
@@ -30,7 +30,7 @@ namespace TcgEngine
         }
 
         // 玩家目标版本
-        public override void DoEffect(GameLogic logic, AbilityData iability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData iability, Card caster, Player target)
         {
             int count = GetRepeatCount(logic.GameData, iability); // 获取重复次数
             for (int i = 0; i < count; i++)
@@ -41,7 +41,7 @@ namespace TcgEngine
         }
 
         // 卡牌目标版本
-        public override void DoEffect(GameLogic logic, AbilityData iability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData iability, Card caster, Card target)
         {
             int count = GetRepeatCount(logic.GameData, iability); // 获取重复次数
             for (int i = 0; i < count; i++)
@@ -55,7 +55,7 @@ namespace TcgEngine
         public int GetRepeatCount(Game game, AbilityData iability)
         {
             if (type == EffectRepeatType.SelectedValue)
-                return game.selected_value;  // 玩家选择的值
+                return game.Selection.SelectedValue;  // 玩家选择的值
             if (type == EffectRepeatType.FixedValue)
                 return iability.value;       // 技能自身固定值
             return 0;                        // 默认 0 次

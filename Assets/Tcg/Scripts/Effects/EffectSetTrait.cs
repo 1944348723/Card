@@ -19,25 +19,25 @@ namespace TcgEngine
         public TraitData trait;  // 要设置的自定义属性
 
         // 对玩家目标执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             target.SetTrait(trait.id, ability.value); // 设置玩家自定义属性
         }
 
         // 对卡牌目标执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             target.SetTrait(trait.id, ability.value); // 设置卡牌自定义属性
         }
 
         // 对玩家目标执行持续效果（Ongoing）
-        public override void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoOngoingEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             target.SetTrait(trait.id, ability.value); // 设置玩家自定义属性
         }
 
         // 对卡牌目标执行持续效果（Ongoing）
-        public override void DoOngoingEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoOngoingEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             target.SetTrait(trait.id, ability.value); // 设置卡牌自定义属性
         }

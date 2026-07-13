@@ -74,12 +74,12 @@ namespace TcgEngine.UI
                 // 更新英雄能力UI
                 power_image.sprite = hero.CardData.GetBoardArt(hero.VariantData);
                 power_image.material = !hero.exhausted ? active_mat : inactive_mat;
-                power_mana_slot?.SetActive(gdata.IsPlayerTurn(player) && !hero.exhausted);
+                power_mana_slot?.SetActive(GameClient.Get().Rules.IsPlayerTurn(player) && !hero.exhausted);
                 power_mana.text = ability.mana_cost.ToString();
             }
 
             if (power_button != null)
-                power_button.interactable = ability != null && !hero.exhausted && gdata.IsPlayerTurn(player);
+                power_button.interactable = ability != null && !hero.exhausted && GameClient.Get().Rules.IsPlayerTurn(player);
 
             if (hero != null && !power_area.activeSelf)
                 power_area.SetActive(true);
@@ -109,7 +109,8 @@ namespace TcgEngine.UI
                     return;
 
                 // 验证是否可以施放能力
-                bool valid = gdata.IsPlayerActionTurn(player) && gdata.CanCastAbility(hero, ability);
+                bool valid = GameClient.Get().Rules.IsPlayerActionTurn(player)
+                    && GameClient.Get().Rules.CanCastAbility(hero, ability);
                 if (valid)
                 {
                     GameClient.Get().CastAbility(hero, ability);

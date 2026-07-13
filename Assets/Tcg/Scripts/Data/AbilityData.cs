@@ -224,58 +224,58 @@ namespace TcgEngine
         }
 
         // 执行技能效果（无特定目标）
-        public void DoEffects(GameLogic logic, Card caster)
+        public void DoEffects(EffectContext context, Card caster)
         {
             foreach(EffectData effect in effects)
-                effect?.DoEffect(logic, this, caster);
+                effect?.DoEffect(context, this, caster);
         }
 
         // 执行技能效果（卡牌目标）
-        public void DoEffects(GameLogic logic, Card caster, Card target)
+        public void DoEffects(EffectContext context, Card caster, Card target)
         {
             foreach (EffectData effect in effects)
-                effect?.DoEffect(logic, this, caster, target);
+                effect?.DoEffect(context, this, caster, target);
             foreach(StatusData stat in status)
                 target.AddStatus(stat, value, duration);
         }
 
         // 执行技能效果（玩家目标）
-        public void DoEffects(GameLogic logic, Card caster, Player target)
+        public void DoEffects(EffectContext context, Card caster, Player target)
         {
             foreach (EffectData effect in effects)
-                effect?.DoEffect(logic, this, caster, target);
+                effect?.DoEffect(context, this, caster, target);
             foreach (StatusData stat in status)
                 target.AddStatus(stat, value, duration);
         }
 
         // 执行技能效果（格子目标）
-        public void DoEffects(GameLogic logic, Card caster, Slot target)
+        public void DoEffects(EffectContext context, Card caster, Slot target)
         {
             foreach (EffectData effect in effects)
-                effect?.DoEffect(logic, this, caster, target);
+                effect?.DoEffect(context, this, caster, target);
         }
 
         // 执行技能效果（卡牌数据目标）
-        public void DoEffects(GameLogic logic, Card caster, CardData target)
+        public void DoEffects(EffectContext context, Card caster, CardData target)
         {
             foreach (EffectData effect in effects)
-                effect?.DoEffect(logic, this, caster, target);
+                effect?.DoEffect(context, this, caster, target);
         }
 
         // 执行持续技能效果（卡牌目标）
-        public void DoOngoingEffects(GameLogic logic, Card caster, Card target)
+        public void DoOngoingEffects(EffectContext context, Card caster, Card target)
         {
             foreach (EffectData effect in effects)
-                effect?.DoOngoingEffect(logic, this, caster, target);
+                effect?.DoOngoingEffect(context, this, caster, target);
             foreach (StatusData stat in status)
                 target.AddOngoingStatus(stat, value);
         }
 
         // 执行持续技能效果（玩家目标）
-        public void DoOngoingEffects(GameLogic logic, Card caster, Player target)
+        public void DoOngoingEffects(EffectContext context, Card caster, Player target)
         {
             foreach (EffectData effect in effects)
-                effect?.DoOngoingEffect(logic, this, caster, target);
+                effect?.DoOngoingEffect(context, this, caster, target);
             foreach (StatusData stat in status)
                 target.AddOngoingStatus(stat, value);
         }
@@ -515,8 +515,7 @@ namespace TcgEngine
 
             if (target == AbilityTarget.AllSlots)
             {
-                List<Slot> slots = Slot.GetAll();
-                foreach (Slot slot in slots)
+                foreach (Slot slot in data.Board.GetAll())
                 {
                     if (AreTargetConditionsMet(data, caster, slot))
                         targets.Add(slot);
@@ -666,7 +665,7 @@ namespace TcgEngine
         // 检查是否存在有效的格子目标
         public bool HasValidSlotTarget(Game game_data, Card caster)
         {
-            foreach (Slot slot in Slot.GetAll())
+            foreach (Slot slot in game_data.Board.GetAll())
             {
                 if (CanTarget(game_data, caster, slot))
                     return true;

@@ -58,8 +58,41 @@ namespace TcgEngine.Gameplay
 
         public GameLogic(Game game, bool isAi = false, System.Random random = null)
         {
-            runtime = new GameRuntime(this, game, isAi, random);
+            runtime = new GameRuntime(game, isAi, random);
+            BindRuntimeEvents();
             SetData(game);
+        }
+
+        private void BindRuntimeEvents()
+        {
+            runtime.Events.GameStarted += () => onGameStart?.Invoke();
+            runtime.Events.GameEnded += player => onGameEnd?.Invoke(player);
+            runtime.Events.TurnStarted += () => onTurnStart?.Invoke();
+            runtime.Events.MainPhaseStarted += () => onTurnPlay?.Invoke();
+            runtime.Events.TurnEnded += () => onTurnEnd?.Invoke();
+            runtime.Events.CardPlayed += (card, slot) => onCardPlayed?.Invoke(card, slot);
+            runtime.Events.CardSummoned += (card, slot) => onCardSummoned?.Invoke(card, slot);
+            runtime.Events.CardMoved += (card, slot) => onCardMoved?.Invoke(card, slot);
+            runtime.Events.CardTransformed += card => onCardTransformed?.Invoke(card);
+            runtime.Events.CardDiscarded += card => onCardDiscarded?.Invoke(card);
+            runtime.Events.CardsDrawn += count => onCardDrawn?.Invoke(count);
+            runtime.Events.Rolled += value => onRollValue?.Invoke(value);
+            runtime.Events.AbilityStarted += (ability, caster) => onAbilityStart?.Invoke(ability, caster);
+            runtime.Events.AbilityTargetedCard += (ability, caster, target) => onAbilityTargetCard?.Invoke(ability, caster, target);
+            runtime.Events.AbilityTargetedPlayer += (ability, caster, target) => onAbilityTargetPlayer?.Invoke(ability, caster, target);
+            runtime.Events.AbilityTargetedSlot += (ability, caster, target) => onAbilityTargetSlot?.Invoke(ability, caster, target);
+            runtime.Events.AbilityEnded += (ability, caster) => onAbilityEnd?.Invoke(ability, caster);
+            runtime.Events.AttackStarted += (attacker, target) => onAttackStart?.Invoke(attacker, target);
+            runtime.Events.AttackEnded += (attacker, target) => onAttackEnd?.Invoke(attacker, target);
+            runtime.Events.PlayerAttackStarted += (attacker, target) => onAttackPlayerStart?.Invoke(attacker, target);
+            runtime.Events.PlayerAttackEnded += (attacker, target) => onAttackPlayerEnd?.Invoke(attacker, target);
+            runtime.Events.CardDamaged += (target, value) => onCardDamaged?.Invoke(target, value);
+            runtime.Events.CardHealed += (target, value) => onCardHealed?.Invoke(target, value);
+            runtime.Events.PlayerDamaged += (target, value) => onPlayerDamaged?.Invoke(target, value);
+            runtime.Events.PlayerHealed += (target, value) => onPlayerHealed?.Invoke(target, value);
+            runtime.Events.SecretTriggered += (secret, triggerer) => onSecretTrigger?.Invoke(secret, triggerer);
+            runtime.Events.SecretResolved += (secret, triggerer) => onSecretResolve?.Invoke(secret, triggerer);
+            runtime.Events.Refreshed += () => onRefresh?.Invoke();
         }
 
         public virtual void SetData(Game game)
@@ -181,7 +214,7 @@ namespace TcgEngine.Gameplay
         public virtual void DrawCards(Player player, int count = 1)
         {
             int drawn = runtime.Cards.DrawCards(player, count);
-            onCardDrawn?.Invoke(drawn);
+            runtime.Events.RaiseCardsDrawn(drawn);
         }
 
         public virtual void DiscardCardsFromHand(Player player, int count = 1)
@@ -228,9 +261,9 @@ namespace TcgEngine.Gameplay
         /// 为效果层提供统一的非战场移区入口。
         /// 不触发死亡、出牌或动画事件；这些行为仍由专用规则流程负责。
         /// </summary>
-        public virtual bool MoveCardToZone(Player player, Card card, CardZone zone, bool clearCard = false)
+        public virtual bool MoveCardToZone(Card card, CardZone zone, bool clearCard = false)
         {
-            bool moved = runtime.Zones.MoveTo(player, card, zone);
+            bool moved = runtime.Zones.MoveTo(card, zone);
             if (moved && clearCard)
                 card.Clear();
             return moved;
@@ -292,7 +325,7 @@ namespace TcgEngine.Gameplay
         public virtual int RollRandomValue(int min, int max)
         {
             runtime.Game.rolled_value = runtime.Random.Next(min, max); // 生成随机值
-            onRollValue?.Invoke(runtime.Game.rolled_value);    // 触发掷骰事件
+            runtime.Events.RaiseRolled(runtime.Game.rolled_value); // 触发掷骰事件
             runtime.ResolveQueue.SetDelay(1f);                     // 设置延迟
             return runtime.Game.rolled_value;
         }
@@ -356,8 +389,7 @@ namespace TcgEngine.Gameplay
         // 基本逻辑是先将加成清零（CleanOngoing），再重新计算以确保持续效果存在
         public virtual void UpdateOngoings()
         {
-            runtime.Ongoings.UpdateOngoings();
-            runtime.Cards.CleanupInvalidCards(runtime.CardsToClear);
+            runtime.UpdateOngoings();
         }
 
        //---- 秘密卡相关 ------------
@@ -426,7 +458,10 @@ namespace TcgEngine.Gameplay
 
         public virtual void RefreshData()
         {
-            onRefresh?.Invoke(); // 触发刷新事件
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            GameStateInvariantValidator.ThrowIfInvalid(runtime.Game);
+#endif
+            runtime.Events.RaiseRefreshed(); // 触发刷新事件
         }
 
         public virtual void ClearResolve()
@@ -460,6 +495,7 @@ namespace TcgEngine.Gameplay
         }
 
         // 属性访问器
+        public GameRules Rules => runtime.Rules;
         public Game GameData { get { return runtime.Game; } }
     }
 }

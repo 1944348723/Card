@@ -1,39 +1,52 @@
 namespace TcgEngine.Gameplay
 {
     /// <summary>
-    /// 纯规则查询：不发送事件、不修改游戏状态、不依赖运行时队列。
+    /// Read-only game rule queries bound to the current game state.
+    /// This service never mutates state, publishes events, or touches the resolve queue.
     /// </summary>
-    public static class RuleValidator
+    public sealed class GameRules
     {
-        public static bool IsPlayerTurn(Game game, Player player)
+        private Game game;
+
+        public GameRules(Game game)
         {
-            return IsPlayerActionTurn(game, player) || IsPlayerSelectorTurn(game, player);
+            SetData(game);
         }
 
-        public static bool IsPlayerActionTurn(Game game, Player player)
+        public void SetData(Game game)
+        {
+            this.game = game;
+        }
+
+        public bool IsPlayerTurn(Player player)
+        {
+            return IsPlayerActionTurn(player) || IsPlayerSelectorTurn(player);
+        }
+
+        public bool IsPlayerActionTurn(Player player)
         {
             return player != null
                 && game.current_player == player.player_id
                 && game.state == GameState.Play
                 && game.phase == GamePhase.Main
-                && game.selector == SelectorType.None;
+                && !game.Selection.IsActive;
         }
 
-        public static bool IsPlayerSelectorTurn(Game game, Player player)
+        public bool IsPlayerSelectorTurn(Player player)
         {
             return player != null
-                && game.selector_player_id == player.player_id
+                && game.Selection.PlayerId == player.player_id
                 && game.state == GameState.Play
                 && game.phase == GamePhase.Main
-                && game.selector != SelectorType.None;
+                && game.Selection.IsActive;
         }
 
-        public static bool IsPlayerMulliganTurn(Game game, Player player)
+        public bool IsPlayerMulliganTurn(Player player)
         {
             return game.phase == GamePhase.Mulligan && !player.ready;
         }
 
-        public static bool CanPlayCard(Game game, Card card, Slot slot, bool skipCost)
+        public bool CanPlayCard(Card card, Slot slot, bool skipCost = false)
         {
             if (card == null)
                 return false;
@@ -47,11 +60,11 @@ namespace TcgEngine.Gameplay
                 return false;
 
             if (card.CardData.IsBoardCard())
-                return slot.IsBoardSlot() && !game.HasCardOnSlot(slot) && slot.BelongsToPlayer(card.player_id);
+                return game.Board.Contains(slot) && !game.HasCardOnSlot(slot) && slot.BelongsToPlayer(card.player_id);
 
             if (card.CardData.IsEquipment())
             {
-                if (!slot.IsBoardSlot())
+                if (!game.Board.Contains(slot))
                     return false;
 
                 Card target = game.GetSlotCard(slot);
@@ -61,16 +74,16 @@ namespace TcgEngine.Gameplay
             }
 
             if (card.CardData.IsRequireTargetSpell())
-                return IsPlayTargetValid(game, card, slot);
+                return IsPlayTargetValid(card, slot);
             if (card.CardData.type == CardType.Spell)
-                return CanAnyPlayAbilityTrigger(game, card);
+                return CanAnyPlayAbilityTrigger(card);
 
             return true;
         }
 
-        public static bool CanMoveCard(Game game, Card card, Slot slot, bool skipCost)
+        public bool CanMoveCard(Card card, Slot slot, bool skipCost = false)
         {
-            if (card == null || !slot.IsBoardSlot())
+            if (card == null || !game.Board.Contains(slot))
                 return false;
             if (!game.IsOnBoard(card) || !card.CanMove(skipCost))
                 return false;
@@ -80,7 +93,7 @@ namespace TcgEngine.Gameplay
             return game.GetSlotCard(slot) == null;
         }
 
-        public static bool CanAttackTarget(Game game, Card attacker, Player target, bool skipCost)
+        public bool CanAttackTarget(Card attacker, Player target, bool skipCost = false)
         {
             if (attacker == null || target == null)
                 return false;
@@ -94,7 +107,7 @@ namespace TcgEngine.Gameplay
             return true;
         }
 
-        public static bool CanAttackTarget(Game game, Card attacker, Card target, bool skipCost)
+        public bool CanAttackTarget(Card attacker, Card target, bool skipCost = false)
         {
             if (attacker == null || target == null)
                 return false;
@@ -112,7 +125,7 @@ namespace TcgEngine.Gameplay
             return true;
         }
 
-        public static bool CanCastAbility(Game game, Card card, AbilityData ability)
+        public bool CanCastAbility(Card card, AbilityData ability)
         {
             if (ability == null || card == null || !card.CanDoActivatedAbilities())
                 return false;
@@ -123,7 +136,7 @@ namespace TcgEngine.Gameplay
             return player.CanPayAbility(card, ability) && ability.AreTriggerConditionsMet(game, card);
         }
 
-        public static bool CanSelectAbility(Game game, Card card, AbilityData ability)
+        public bool CanSelectAbility(Card card, AbilityData ability)
         {
             if (ability == null || card == null || !card.CanDoAbilities())
                 return false;
@@ -132,7 +145,7 @@ namespace TcgEngine.Gameplay
             return player.CanPayAbility(card, ability) && ability.AreTriggerConditionsMet(game, card);
         }
 
-        public static bool CanAnyPlayAbilityTrigger(Game game, Card card)
+        public bool CanAnyPlayAbilityTrigger(Card card)
         {
             if (card == null)
                 return false;
@@ -148,7 +161,7 @@ namespace TcgEngine.Gameplay
             return false;
         }
 
-        public static bool IsPlayTargetValid(Game game, Card caster, Player target)
+        public bool IsPlayTargetValid(Card caster, Player target)
         {
             if (caster == null || target == null)
                 return false;
@@ -163,7 +176,7 @@ namespace TcgEngine.Gameplay
             return true;
         }
 
-        public static bool IsPlayTargetValid(Game game, Card caster, Card target)
+        public bool IsPlayTargetValid(Card caster, Card target)
         {
             if (caster == null || target == null)
                 return false;
@@ -178,16 +191,16 @@ namespace TcgEngine.Gameplay
             return true;
         }
 
-        public static bool IsPlayTargetValid(Game game, Card caster, Slot target)
+        public bool IsPlayTargetValid(Card caster, Slot target)
         {
             if (caster == null)
                 return false;
             if (target.IsPlayerSlot())
-                return IsPlayTargetValid(game, caster, game.GetPlayer(target.p));
+                return IsPlayTargetValid(caster, game.GetPlayer(target.p));
 
             Card card = game.GetSlotCard(target);
             if (card != null)
-                return IsPlayTargetValid(game, caster, card);
+                return IsPlayTargetValid(caster, card);
 
             foreach (AbilityData ability in caster.GetAbilities())
             {

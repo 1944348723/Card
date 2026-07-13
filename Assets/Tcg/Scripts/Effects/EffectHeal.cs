@@ -16,13 +16,13 @@ namespace TcgEngine
     public class EffectHeal : EffectData
     {
         // 对玩家执行治疗
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             logic.HealPlayer(target, ability.value);  // 恢复目标玩家 HP
         }
 
         // 对卡牌执行治疗
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             logic.HealCard(target, ability.value);    // 恢复目标卡牌 HP
         }

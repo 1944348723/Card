@@ -20,7 +20,7 @@ namespace TcgEngine
         public StatusData status;   // 要移除的状态（如果为空则移除全部状态）
 
         // 对“玩家目标”生效
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             // 如果有指定具体状态 → 移除该状态
             if (status != null)
@@ -31,7 +31,7 @@ namespace TcgEngine
         }
 
         // 对“卡牌目标”生效
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             // 如果有指定具体状态 → 移除该状态
             if (status != null)

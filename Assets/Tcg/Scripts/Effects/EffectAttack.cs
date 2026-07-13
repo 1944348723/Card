@@ -16,7 +16,7 @@ namespace TcgEngine
         public EffectAttackerType attacker_type;   // 指定攻击者的类型（谁来发动攻击）
 
         // 对“玩家目标”执行效果：让某个卡牌攻击玩家
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Player target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Player target)
         {
             Card attacker = GetAttacker(logic.GetGameData(), caster);  // 获取真正的攻击者
             if (attacker != null)
@@ -27,7 +27,7 @@ namespace TcgEngine
         }
 
         // 对“卡牌目标”执行效果：让某个卡牌攻击另一张卡
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             Card attack = GetAttacker(logic.GetGameData(), caster);    // 获取真正的攻击者
             if (attack != null)

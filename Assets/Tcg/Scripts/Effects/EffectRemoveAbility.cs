@@ -17,7 +17,7 @@ namespace TcgEngine
         public AbilityData remove_ability;  // 要移除的技能/能力
 
         // 对卡牌执行效果
-        public override void DoEffect(GameLogic logic, AbilityData ability, Card caster, Card target)
+        public override void DoEffect(EffectContext logic, AbilityData ability, Card caster, Card target)
         {
             target.RemoveAbility(remove_ability); // 从卡牌上移除指定技能
         }

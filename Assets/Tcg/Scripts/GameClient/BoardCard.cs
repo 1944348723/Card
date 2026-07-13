@@ -168,7 +168,7 @@ namespace TcgEngine.Client
                         {
                             AbilityButton button = buttons[index];
                             button.SetAbility(card, iability);                          // 设置技能按钮数据
-                            button.SetInteractable(data.CanCastAbility(card, iability)); // 设置按钮是否可用
+                            button.SetInteractable(GameClient.Get().Rules.CanCastAbility(card, iability)); // 设置按钮是否可用
                         }
                         index++;
                     }
@@ -187,7 +187,7 @@ namespace TcgEngine.Client
                             {
                                 AbilityButton button = buttons[index];
                                 button.SetAbility(equip, iability);
-                                button.SetInteractable(data.CanCastAbility(equip, iability));
+                                button.SetInteractable(GameClient.Get().Rules.CanCastAbility(equip, iability));
                             }
                             index++;
                         }
