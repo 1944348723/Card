@@ -71,7 +71,7 @@ namespace TcgEngine.Client
         private int observe_player_id = 0;  // 观战目标
         private float timer = 0f;
 
-        private Dictionary<ushort, RefreshEvent> registered_commands = new Dictionary<ushort, RefreshEvent>();  // 注册的刷新指令
+        private readonly Dictionary<ushort, UnityAction<SerializedData>> refreshHandlers = new();
 
         private static GameClient instance;
 
@@ -261,19 +261,15 @@ namespace TcgEngine.Client
 
         private void RegisterRefresh(ushort tag, UnityAction<SerializedData> callback)
         {
-            RefreshEvent cmdevt = new RefreshEvent();
-            cmdevt.tag = tag;          // 刷新事件标识
-            cmdevt.callback = callback; // 回调方法
-            registered_commands.Add(tag, cmdevt); // 注册刷新事件
+            refreshHandlers.Add(tag, callback);
         }
 
         public void OnReceiveRefresh(ulong client_id, FastBufferReader reader)
         {
             reader.ReadValueSafe(out ushort type); // 读取刷新类型
-            bool found = registered_commands.TryGetValue(type, out RefreshEvent command);
-            if (found)
+            if (refreshHandlers.TryGetValue(type, out UnityAction<SerializedData> handler))
             {
-                command.callback.Invoke(new SerializedData(reader)); // 调用对应回调
+                handler.Invoke(new SerializedData(reader)); // 调用对应回调
             }
         }
 
@@ -753,11 +749,5 @@ namespace TcgEngine.Client
             return instance; // 获取GameClient单例实例
         }
 
-    }
-
-    public class RefreshEvent
-    {
-        public ushort tag;                                 // 刷新事件标识
-        public UnityAction<SerializedData> callback;       // 回调方法
     }
 }
