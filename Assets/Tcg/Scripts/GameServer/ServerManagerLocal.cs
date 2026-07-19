@@ -117,7 +117,7 @@ namespace TcgEngine.Server
                     return;
 
                 // 检查是否可以连接游戏（已存在玩家或未满人数）
-                bool can_connect = server.IsPlayer(msg.user_id) || server.CountPlayers() < server.nb_players;
+                bool can_connect = server.IsPlayer(msg.user_id) || server.CountPlayers() < server.playersCount;
                 if (can_connect)
                 {
                     // 设置客户端数据
@@ -151,7 +151,7 @@ namespace TcgEngine.Server
             {
                 // 仅处理已连接玩家的动作
                 if (server.IsConnectedPlayer(client.user_id))
-                    server.ReceiveAction(client_id, reader);
+                    server.ReceiveCommand(client_id, reader);
             }
         }
 

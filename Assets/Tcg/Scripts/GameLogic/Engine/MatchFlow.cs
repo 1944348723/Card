@@ -177,9 +177,13 @@ namespace TcgEngine.Gameplay
                 return;
             }
 
-            runtime.Selection.Cancel();
-            runtime.ResolveQueue.AddCallback(EndTurn);
-            runtime.ResolveQueue.ResolveAll();
+            if (runtime.Game.phase == GamePhase.Main)
+            {
+                // 结束回合
+                runtime.Selection.Cancel();
+                runtime.ResolveQueue.AddCallback(EndTurn);
+                runtime.ResolveQueue.ResolveAll();
+            }
         }
 
         public void CheckForWinner()

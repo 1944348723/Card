@@ -1,9 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using TcgEngine.AI;
 using TcgEngine.Gameplay;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.Events;
 
 namespace TcgEngine.Server
 {
@@ -15,24 +16,28 @@ namespace TcgEngine.Server
     /// </summary>
     public class GameServer
     {
-        public string game_uid; // 游戏唯一ID
-        public int nb_players = 2;
+        public string gameUID; // 游戏唯一ID
+        public int playersCount = 2;
 
-        public static float game_expire_time = 30f;   // 当没有任何玩家连接时，游戏在这个时间后被删除
-        public static float win_expire_time = 60f;    // 当只剩一个玩家在线时，超过这个时间将自动判定他获胜
+        public static float gameExpireTime = 30f;   // 当没有任何玩家连接时，游戏在这个时间后被删除
+        public static float winExpireTime = 60f;    // 当只剩一个玩家在线时，超过这个时间将自动判定他获胜
 
-        private Game game_data;
+        private Game gameData;
         private GameLogic gameplay;
         private float expiration = 0f;
-        private float win_expiration = 0f;
-        private bool is_dedicated_server = false;
+        private float winExpiration = 0f;
+        private bool isDedicatedServer = false;
 
-        private List<ClientData> players = new List<ClientData>();            // 只包含玩家（不包含观察者），断线后仍保留在数组中，只有玩家可以发送指令
-        private List<ClientData> connected_clients = new List<ClientData>();  // 包含所有已连接客户端（包括观察者），断线会移除，所有人都会接收刷新数据
-        private List<AIPlayer> ai_list = new List<AIPlayer>();                // AI 玩家列表
-        private Queue<QueuedGameAction> queued_actions = new Queue<QueuedGameAction>(); // 排队等待执行的游戏行为队列
+        private List<ClientData> players = new();            // 只包含玩家（不包含观察者），断线后仍保留在数组中，只有玩家可以发送指令
+        private List<ClientData> connectedClients = new();  // 包含所有已连接客户端（包括观察者），断线会移除，所有人都会接收刷新数据
+        private List<AIPlayer> aiPlayers = new();                // AI 玩家列表
+        private Queue<PendingClientCommand> pendingCommands = new();
+        private HashSet<int> playersSettingUp = new();         // 正在异步校验配置的玩家，防止重复提交
         
-        private Dictionary<ushort, CommandEvent> registered_commands = new Dictionary<ushort, CommandEvent>();
+        private Dictionary<ushort, Action<ClientData, SerializedData>> commandHandlers = new();
+
+        public ulong ServerID { get { return TcgNetwork.Get().ServerID; } }
+        public NetworkMessaging Messaging { get { return TcgNetwork.Get().Messaging; } }
 
         public GameServer(string uid, int players, bool online)
         {
@@ -44,33 +49,33 @@ namespace TcgEngine.Server
             Clear();
         }
 
-        protected virtual void Init(string uid, int players, bool online)
+        private void Init(string uid, int players, bool online)
         {
-            game_uid = uid;
-            nb_players = Mathf.Max(players, 2);
-            is_dedicated_server = online;
-            game_data = new Game(uid, nb_players);
-            gameplay = new GameLogic(game_data);
+            gameUID = uid;
+            playersCount = Mathf.Max(players, 2);
+            isDedicatedServer = online;
+            gameData = new Game(uid, playersCount);
+            gameplay = new GameLogic(gameData);
 
             // 注册各种游戏指令
-            RegisterAction(GameAction.PlayerSettings, ReceivePlayerSettings);
-            RegisterAction(GameAction.PlayerSettingsAI, ReceivePlayerSettingsAI);
-            RegisterAction(GameAction.GameSettings, ReceiveGameplaySettings);
-            RegisterAction(GameAction.PlayCard, ReceivePlayCard);
-            RegisterAction(GameAction.Attack, ReceiveAttackTarget);
-            RegisterAction(GameAction.AttackPlayer, ReceiveAttackPlayer);
-            RegisterAction(GameAction.Move, ReceiveMove);
-            RegisterAction(GameAction.CastAbility, ReceiveCastCardAbility);
-            RegisterAction(GameAction.SelectCard, ReceiveSelectCard);
-            RegisterAction(GameAction.SelectPlayer, ReceiveSelectPlayer);
-            RegisterAction(GameAction.SelectSlot, ReceiveSelectSlot);
-            RegisterAction(GameAction.SelectChoice, ReceiveSelectChoice);
-            RegisterAction(GameAction.SelectCost, ReceiveSelectCost);
-            RegisterAction(GameAction.SelectMulligan, ReceiveSelectMulligan);
-            RegisterAction(GameAction.CancelSelect, ReceiveCancelSelection);
-            RegisterAction(GameAction.EndTurn, ReceiveEndTurn);
-            RegisterAction(GameAction.Resign, ReceiveResign);
-            RegisterAction(GameAction.ChatMessage, ReceiveChat);
+            RegisterCommandHandler(GameAction.PlayerSettings, ReceivePlayerSettings);
+            RegisterCommandHandler(GameAction.PlayerSettingsForAI, ReceivePlayerSettingsForAI);
+            RegisterCommandHandler(GameAction.GameSettings, ReceiveGameplaySettings);
+            RegisterCommandHandler(GameAction.PlayCard, ReceivePlayCard);
+            RegisterCommandHandler(GameAction.Attack, ReceiveAttackTarget);
+            RegisterCommandHandler(GameAction.AttackPlayer, ReceiveAttackPlayer);
+            RegisterCommandHandler(GameAction.Move, ReceiveMove);
+            RegisterCommandHandler(GameAction.CastAbility, ReceiveCastCardAbility);
+            RegisterCommandHandler(GameAction.SelectCard, ReceiveSelectCard);
+            RegisterCommandHandler(GameAction.SelectPlayer, ReceiveSelectPlayer);
+            RegisterCommandHandler(GameAction.SelectSlot, ReceiveSelectSlot);
+            RegisterCommandHandler(GameAction.SelectChoice, ReceiveSelectChoice);
+            RegisterCommandHandler(GameAction.SelectCost, ReceiveSelectCost);
+            RegisterCommandHandler(GameAction.SelectMulligan, ReceiveSelectMulligan);
+            RegisterCommandHandler(GameAction.CancelSelect, ReceiveCancelSelection);
+            RegisterCommandHandler(GameAction.EndTurn, ReceiveEndTurn);
+            RegisterCommandHandler(GameAction.Resign, ReceiveResign);
+            RegisterCommandHandler(GameAction.ChatMessage, ReceiveChat);
 
             // 绑定游戏事件
             gameplay.onGameStart += OnGameStart;
@@ -139,480 +144,50 @@ namespace TcgEngine.Server
             gameplay.onSecretResolve -= OnSecretResolved;
         }
 
-        public virtual void Update()
+        public void Update()
         {
-            // 如果无人连接或游戏已结束，开始累计“被删除计时”
-            int connected_players = CountConnectedClients();
-            if (HasGameEnded() || connected_players == 0)
-                expiration += Time.deltaTime;
+            StartGameWhenReady();
+            UpdateGameLifecycle(Time.deltaTime);
+            UpdateTurnTimer(Time.deltaTime);
 
-            // 如果只剩一个玩家连接，开始累计“自动胜利计时”
-            if (connected_players == 1 && HasGameStarted() && !HasGameEnded())
-                win_expiration += Time.deltaTime;
-
-            // 仅在专用服务器上生效，到达胜利计时则结束游戏
-            if (is_dedicated_server && !HasGameEnded() && IsWinExpired())
-                EndExpiredGame();
-
-            // 游戏进行中的回合计时
-            if (game_data.state == GameState.Play && !gameplay.IsResolving())
-            {
-                game_data.turn_timer -= Time.deltaTime;
-                if (game_data.turn_timer <= 0f)
-                {
-                    // 回合时间到
-                    gameplay.NextStep();
-                }
-            }
-
-            // 连接阶段，若所有玩家已连接且准备完成则开始游戏
-            if (game_data.state == GameState.Connecting)
-            {
-                bool all_connected = game_data.AreAllPlayersConnected();
-                bool all_ready = game_data.AreAllPlayersReady();
-                if (all_connected && all_ready)
-                {
-                    StartGame();
-                }
-            }
-
-            // 处理排队中的指令
-            if (queued_actions.Count > 0 && !gameplay.IsResolving())
-            {
-                QueuedGameAction action = queued_actions.Dequeue();
-                ExecuteAction(action.type, action.client, action.sdata);
-            }
-
-            // 更新游戏逻辑
+            // 注意顺序，先处理输入，再游戏逻辑，输入正好会带来需要更新的逻辑。然后再更新AI，让AI感知最新的游戏变化
+            ProcessNextPendingCommand();
             gameplay.Update(Time.deltaTime);
-
-            // 更新 AI
-            foreach (AIPlayer ai in ai_list)
+            foreach (AIPlayer ai in aiPlayers)
             {
                 ai.Update();
             }
         }
 
-        protected virtual void StartGame()
-        {
-            // 设置并创建 AI
-            bool ai_vs_ai = !is_dedicated_server && GameplayData.Get().ai_vs_ai;
-            foreach (Player player in game_data.players)
-            {
-                if (player.is_ai || ai_vs_ai)
-                {
-                    AIPlayer ai_gameplay = AIPlayer.Create(GameplayData.Get().ai_type, gameplay, player.player_id, player.ai_level);
-                    ai_list.Add(ai_gameplay);
-                }
-            }
-
-            // 开始游戏
-            gameplay.StartGame();
-        }
-
-        // 当只剩一名玩家在线并达到超时时结束游戏
-        protected virtual void EndExpiredGame()
-        {
-            Game gdata = gameplay.GetGameData();
-            foreach (Player player in gdata.players)
-            {
-                if (player.IsConnected())
-                {
-                    gameplay.EndGame(player.player_id);
-                    return;
-                }
-            }
-        }
-
-        //------ 接收指令 -------
-
-        private void RegisterAction(ushort tag, UnityAction<ClientData, SerializedData> callback)
-        {
-            CommandEvent cmdevt = new CommandEvent();
-            cmdevt.tag = tag;
-            cmdevt.callback = callback;
-            registered_commands.Add(tag, cmdevt);
-        }
-
-        public void ReceiveAction(ulong client_id, FastBufferReader reader)
+        public void ReceiveCommand(ulong client_id, FastBufferReader reader)
         {
             ClientData client = GetClient(client_id);
-            if (client != null)
+            if (client == null) return;
+
+            reader.ReadValueSafe(out ushort type);
+            SerializedData sdata = new(reader);
+            if (!gameplay.IsResolving())
             {
-                reader.ReadValueSafe(out ushort type);
-                SerializedData sdata = new SerializedData(reader);
-                if (!gameplay.IsResolving())
+                ExecuteCommand(type, client, sdata);
+            }
+            else
+            {
+                sdata.PreRead();
+                PendingClientCommand command = new()
                 {
-                    // 当前无结算，立即执行指令
-                    ExecuteAction(type, client, sdata);
-                }
-                else
-                {
-                    // 处于结算中，指令进入队列等待执行
-                    QueuedGameAction action = new QueuedGameAction();
-                    action.type = type;
-                    action.client = client;
-                    action.sdata = sdata;
-                    sdata.PreRead();
-                    queued_actions.Enqueue(action);
-                }
+                    type = type,
+                    client = client,
+                    sdata = sdata
+                };
+                pendingCommands.Enqueue(command);
             }
         }
 
-        public void ExecuteAction(ushort type, ClientData client, SerializedData sdata)
+        public void ExecuteCommand(ushort type, ClientData client, SerializedData sdata)
         {
-            bool found = registered_commands.TryGetValue(type, out CommandEvent command);
-            if(found)
-                command.callback.Invoke(client, sdata);
-        }
-
-        //-------
-
-        public void ReceivePlayerSettings(ClientData iclient, SerializedData sdata)
-        {
-            PlayerSettings msg = sdata.Get<PlayerSettings>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null)
+            if (commandHandlers.TryGetValue(type, out var handler))
             {
-                SetPlayerSettings(player.player_id, msg);
-            }
-        }
-
-        public void ReceivePlayerSettingsAI(ClientData iclient, SerializedData sdata)
-        {
-            PlayerSettings msg = sdata.Get<PlayerSettings>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null)
-            {
-                SetPlayerSettingsAI(player.player_id, msg);
-            }
-        }
-        // 接收客户端发送的游戏配置（只在连接阶段有效）
-        public void ReceiveGameplaySettings(ClientData iclient, SerializedData sdata)
-        {
-            GameSettings settings = sdata.Get<GameSettings>();
-            if (settings != null)
-            {
-                SetGameSettings(settings);
-            }
-        }
-
-        // 接收“打出卡牌”请求
-        public void ReceivePlayCard(ClientData iclient, SerializedData sdata)
-        {
-            MsgPlayCard msg = sdata.Get<MsgPlayCard>();
-            Player player = GetPlayer(iclient);
-            // 必须：玩家存在 + 消息有效 + 当前轮到该玩家行动 + 不能在结算中
-            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
-            {
-                Card card = player.GetCard(msg.card_uid);
-                // 校验卡牌存在且属于该玩家，防止作弊
-                if (card != null && card.player_id == player.player_id)
-                    gameplay.PlayCard(card, msg.slot);
-            }
-        }
-
-        // 接收“攻击目标卡牌”请求
-        public void ReceiveAttackTarget(ClientData iclient, SerializedData sdata)
-        {
-            MsgAttack msg = sdata.Get<MsgAttack>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
-            {
-                Card attacker = player.GetCard(msg.attacker_uid);
-                Card target = game_data.GetCard(msg.target_uid);
-                // 攻击者必须属于该玩家
-                if (attacker != null && target != null && attacker.player_id == player.player_id)
-                {
-                    gameplay.AttackTarget(attacker, target);
-                }
-            }
-        }
-
-        // 接收“攻击玩家”请求
-        public void ReceiveAttackPlayer(ClientData iclient, SerializedData sdata)
-        {
-            MsgAttackPlayer msg = sdata.Get<MsgAttackPlayer>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
-            {
-                Card attacker = player.GetCard(msg.attacker_uid);
-                Player target = game_data.GetPlayer(msg.target_id);
-                if (attacker != null && target != null && attacker.player_id == player.player_id)
-                {
-                    gameplay.AttackPlayer(attacker, target);
-                }
-            }
-        }
-
-        // 接收“移动卡牌位置”请求
-        public void ReceiveMove(ClientData iclient, SerializedData sdata)
-        {
-            MsgPlayCard msg = sdata.Get<MsgPlayCard>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
-            {
-                Card card = player.GetCard(msg.card_uid);
-                if (card != null && card.player_id == player.player_id)
-                    gameplay.MoveCard(card, msg.slot);
-            }
-        }
-
-        // 接收“施放卡牌技能”请求
-        public void ReceiveCastCardAbility(ClientData iclient, SerializedData sdata)
-        {
-            MsgCastAbility msg = sdata.Get<MsgCastAbility>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
-            {
-                Card card = player.GetCard(msg.caster_uid);
-                AbilityData iability = AbilityData.Get(msg.ability_id);
-                if (card != null && card.player_id == player.player_id)
-                    gameplay.CastAbility(card, iability);
-            }
-        }
-
-        // 接收“选择卡牌”请求（用于选择阶段）
-        public void ReceiveSelectCard(ClientData iclient, SerializedData sdata)
-        {
-            MsgCard msg = sdata.Get<MsgCard>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
-            {
-                Card target = game_data.GetCard(msg.card_uid);
-                gameplay.SelectCard(target);
-            }
-        }
-
-        // 接收“选择玩家”请求
-        public void ReceiveSelectPlayer(ClientData iclient, SerializedData sdata)
-        {
-            MsgPlayer msg = sdata.Get<MsgPlayer>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
-            {
-                Player target = game_data.GetPlayer(msg.player_id);
-                gameplay.SelectPlayer(target);
-            }
-        }
-
-        // 接收“选择格子位置”请求
-        public void ReceiveSelectSlot(ClientData iclient, SerializedData sdata)
-        {
-            Slot slot = sdata.Get<Slot>();
-            Player player = GetPlayer(iclient);
-            if (player != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
-            {
-                // slot 校验有效性
-                if(game_data.Board.Contains(slot))
-                    gameplay.SelectSlot(slot);
-            }
-        }
-
-        // 接收“选择某个选项（数字型）”请求
-        public void ReceiveSelectChoice(ClientData iclient, SerializedData sdata)
-        {
-            MsgInt msg = sdata.Get<MsgInt>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
-            {
-                gameplay.SelectChoice(msg.value);
-            }
-        }
-
-        // 接收“选择费用”请求
-        public void ReceiveSelectCost(ClientData iclient, SerializedData sdata)
-        {
-            MsgInt msg = sdata.Get<MsgInt>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
-            {
-                gameplay.SelectCost(msg.value);
-            }
-        }
-
-        // 接收“取消选择”请求
-        public void ReceiveCancelSelection(ClientData iclient, SerializedData sdata)
-        {
-            Player player = GetPlayer(iclient);
-            if (player != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
-            {
-                gameplay.CancelSelection();
-            }
-        }
-
-        // 接收“调度牌（换牌阶段 Mulligan）”请求
-        public void ReceiveSelectMulligan(ClientData iclient, SerializedData sdata)
-        {
-            MsgMulligan msg = sdata.Get<MsgMulligan>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null && gameplay.Rules.IsPlayerMulliganTurn(player) && !gameplay.IsResolving())
-            {
-                gameplay.Mulligan(player, msg.cards);
-            }
-        }
-
-        // 接收“结束回合”请求
-        public void ReceiveEndTurn(ClientData iclient, SerializedData sdata)
-        {
-            Player player = GetPlayer(iclient);
-            if (player != null && gameplay.Rules.IsPlayerTurn(player))
-            {
-                gameplay.NextStep();
-            }
-        }
-
-        // 接收“投降”请求
-        public void ReceiveResign(ClientData iclient, SerializedData sdata)
-        {
-            Player player = GetPlayer(iclient);
-            // 游戏必须已开始且未结束
-            if (player != null && game_data.state != GameState.Connecting && game_data.state != GameState.GameEnded)
-            {
-                // 认输则对方直接获胜
-                int winner = player.player_id == 0 ? 1 : 0;
-                gameplay.EndGame(winner);
-            }
-        }
-
-        // 接收聊天消息（强制绑定 sender，防止伪造 player_id）
-        public void ReceiveChat(ClientData iclient, SerializedData sdata)
-        {
-            MsgChat msg = sdata.Get<MsgChat>();
-            Player player = GetPlayer(iclient);
-            if (player != null && msg != null)
-            {
-                msg.player_id = player.player_id; // 强制覆盖，防止伪造身份
-                SendToAll(GameAction.ChatMessage, msg, NetworkDelivery.Reliable);
-            }
-        }
-        
-        //--- Setup Commands ------
-        /// <summary>
-        /// 设置玩家卡组（在连接阶段调用）
-        /// 如果是本地游戏，直接使用本地用户数据
-        /// 如果是在线模式，则通过 API 去服务器校验并加载玩家卡组
-        /// 验证通过 → 设置卡组 → 标记玩家 Ready
-        /// 验证失败 → 输出日志
-        /// </summary>
-        public virtual async void SetPlayerDeck(int player_id, string username, UserDeckData deck)
-        {
-            Player player = game_data.GetPlayer(player_id);
-            
-            // 只有在房间还处于 Connecting 阶段时才能设置卡组
-            if (player != null && game_data.state == GameState.Connecting)
-            {
-                // 默认：离线模式，从本地 Authenticator 获取用户数据
-                UserData user = Authenticator.Get().UserData;
-
-                // 如果是在线模式，通过 API 拉取真实用户数据（校验）
-                if(Authenticator.Get().IsApi())
-                    user = await ApiClient.Get().LoadUserData(username);
-
-                // 从用户数据中找到对应 deck（以 deck.tid 作为唯一标识）
-                UserDeckData udeck = user?.GetDeck(deck.tid);
-                if (user != null && udeck != null)
-                {
-                    // 校验卡组是否合法
-                    if (user.IsDeckValid(udeck))
-                    {
-                        // 设置真实有效的玩家卡组
-                        gameplay.SetPlayerDeck(player, udeck);
-                        SendPlayerReady(player);   // 玩家准备完成
-                        return;
-                    }
-                    else
-                    {
-                        Debug.Log(user.username + " deck is invalid: " + udeck.title);
-                        return;
-                    }
-                }
-
-                // 如果不是 API 卡组，则尝试使用游戏内预设卡组
-                DeckData cdeck = DeckData.Get(deck.tid);
-                if (cdeck != null)
-                    gameplay.SetPlayerDeck(player, cdeck);
-
-                // 测试模式：直接信任客户端传过来的卡组
-                else if (Authenticator.Get().IsTest())
-                    gameplay.SetPlayerDeck(player, deck);
-
-                // 找不到卡组，输出错误
-                else
-                    Debug.Log("Player " + player_id + " deck not found: " + deck.tid);
-
-                SendPlayerReady(player);
-            }
-        }
-
-        /// <summary>
-        /// 设置真实玩家（人类玩家）的配置
-        /// 只能在 Connecting 阶段执行
-        /// 设置头像、卡背、卡组，并标记为 ready
-        /// </summary>
-        public virtual void SetPlayerSettings(int player_id, PlayerSettings psettings)
-        {
-            // 游戏已经开始 → 不允许再设置
-            if (game_data.state != GameState.Connecting)
-                return;
-
-            Player player = game_data.GetPlayer(player_id);
-            if (player != null && !player.ready)
-            {
-                player.avatar = psettings.avatar;       // 玩家头像
-                player.cardback = psettings.cardback;   // 卡背皮肤
-                player.is_ai = false;                   // 明确标记为真人玩家
-                player.ready = true;                    // 玩家准备完毕
-
-                // 设置玩家卡组（内部仍会触发 Ready 校验）
-                SetPlayerDeck(player_id, player.username, psettings.deck);
-
-                RefreshAll();   // 通知所有客户端刷新 UI / 数据
-            }
-        }
-
-        /// <summary>
-        /// 设置 AI 玩家配置
-        /// 只能在 Connecting 阶段执行
-        /// 服务器模式下禁止 AI（只能本地游戏用）
-        /// 设置 AI 名字、头像、卡组、难度，并设为 ready
-        /// </summary>
-        public virtual void SetPlayerSettingsAI(int player_id, PlayerSettings psettings)
-        {
-            if (game_data.state != GameState.Connecting)
-                return; // 游戏已开始，不能设置
-
-            if (is_dedicated_server)
-                return; // 专用服务器上不允许 AI
-
-            // AI 作为“对手玩家”加入
-            Player player = game_data.GetOpponentPlayer(player_id);
-            if (player != null && !player.ready)
-            {
-                player.username = psettings.username;   // AI 名字
-                player.avatar = psettings.avatar;       // AI 头像
-                player.cardback = psettings.cardback;   // AI 卡背
-                player.is_ai = true;                    // 标记为 AI
-                player.ready = true;                    // AI 就绪
-                player.ai_level = psettings.ai_level;   // AI 难度
-
-                // 设置 AI 卡组
-                SetPlayerDeck(player.player_id, player.username, psettings.deck);
-
-                RefreshAll();   // 通知客户端刷新
-            }
-        }
-
-        /// <summary>
-        /// 设置游戏规则 / 游戏参数（回合时间、生命值等）
-        /// 只能在游戏开始前（Connecting 阶段）修改
-        /// </summary>
-        public virtual void SetGameSettings(GameSettings settings)
-        {
-            if (game_data.state == GameState.Connecting)
-            {
-                game_data.settings = settings;  // 更新游戏设置
-                RefreshAll();                  // 广播刷新
+                handler.Invoke(client, sdata);
             }
         }
 
@@ -622,14 +197,14 @@ namespace TcgEngine.Server
         // 添加一个客户端到已连接列表（如果还没添加）
         public void AddClient(ClientData client)
         {
-            if (!connected_clients.Contains(client))
-                connected_clients.Add(client);
+            if (!connectedClients.Contains(client))
+                connectedClients.Add(client);
         }
 
         // 从已连接客户端列表中移除一个客户端
         public void RemoveClient(ClientData client)
         {
-            connected_clients.Remove(client);
+            connectedClients.Remove(client);
 
             // 找到该客户端绑定的玩家
             Player player = GetPlayer(client);
@@ -646,7 +221,7 @@ namespace TcgEngine.Server
         // 根据 client_id 查找 ClientData
         public ClientData GetClient(ulong client_id)
         {
-            foreach (ClientData client in connected_clients)
+            foreach (ClientData client in connectedClients)
             {
                 if (client.client_id == client_id)
                     return client;
@@ -663,7 +238,7 @@ namespace TcgEngine.Server
 
             // 根据 user_id 查找对应 player_id
             int player_id = FindPlayerID(client.user_id);
-            Player player = game_data.GetPlayer(player_id);
+            Player player = gameData.GetPlayer(player_id);
 
             // 如果该玩家存在，更新玩家状态（用户名 + 连接状态）
             if (player != null)
@@ -698,7 +273,7 @@ namespace TcgEngine.Server
         public Player GetPlayer(string user_id)
         {
             int player_id = FindPlayerID(user_id);
-            return game_data?.GetPlayer(player_id);
+            return gameData?.GetPlayer(player_id);
         }
 
         // 判断某个 user_id 是否是玩家
@@ -721,21 +296,6 @@ namespace TcgEngine.Server
             return players.Count;
         }
 
-        // 当前真正在线的玩家数量（检查 Player.connected）
-        public int CountConnectedClients()
-        {
-            int nb = 0;
-            Game game = GetGameData();
-            foreach (Player player in game.players)
-            {
-                if (player.IsConnected())
-                {
-                    nb++;
-                }
-            }
-            return nb;
-        }
-
         // 获取当前 Game 数据（封装一层 gameplay）
         public Game GetGameData()
         {
@@ -743,29 +303,22 @@ namespace TcgEngine.Server
         }
 
         // 游戏是否已经正式开始
-        public virtual bool HasGameStarted()
+        public bool HasGameStarted()
         {
-            return gameplay.IsGameStarted();
+            return gameData.HasStarted();
         }
 
         // 游戏是否已经结束
-        public virtual bool HasGameEnded()
+        public bool HasGameEnded()
         {
-            return gameplay.IsGameEnded();
+            return gameData.HasEnded();
         }
 
         // 游戏是否“整体过期”
         // 代表游戏已无人继续参与或终局状态持续太久，可以销毁
-        public virtual bool IsGameExpired()
+        public bool IsGameExpired()
         {
-            return expiration > game_expire_time; 
-        }
-
-        // 胜利等待是否超时
-        // 代表只剩一名玩家在线，等待另一个过久 → 自动判胜
-        public virtual bool IsWinExpired()
-        {
-            return win_expiration > win_expire_time;
+            return expiration > gameExpireTime; 
         }
 
         //---------------- 游戏事件分发（同步给所有客户端） ----------------
@@ -775,10 +328,10 @@ namespace TcgEngine.Server
         {
             SendToAll(GameAction.GameStart);
 
-            if (is_dedicated_server && Authenticator.Get().IsApi())
+            if (isDedicatedServer && Authenticator.Get().IsApi())
             {
                 // 如果接入 Web API，则同步到后端，创建比赛记录
-                ApiClient.Get().CreateMatch(game_data);
+                ApiClient.Get().CreateMatch(gameData);
             }
         }
 
@@ -789,10 +342,10 @@ namespace TcgEngine.Server
             msg.player_id = winner != null ? winner.player_id : -1;
             SendToAll(GameAction.GameEnd, msg, NetworkDelivery.Reliable);
 
-            if (is_dedicated_server && Authenticator.Get().IsApi())
+            if (isDedicatedServer && Authenticator.Get().IsApi())
             {
                 // 通知服务器比赛结束并结算奖励
-                ApiClient.Get().EndMatch(game_data, winner.player_id);
+                ApiClient.Get().EndMatch(gameData, winner.player_id);
             }
         }
 
@@ -800,7 +353,7 @@ namespace TcgEngine.Server
         protected virtual void OnTurnStart()
         {
             MsgPlayer msg = new MsgPlayer();
-            msg.player_id = game_data.current_player;
+            msg.player_id = gameData.current_player;
             SendToAll(GameAction.NewTurn, msg, NetworkDelivery.Reliable);
         }
 
@@ -1030,36 +583,40 @@ namespace TcgEngine.Server
         }
 
         /// <summary>
-        /// 通知所有客户端：某个玩家已准备
-        /// </summary>
-        protected virtual void SendPlayerReady(Player player)
-        {
-            if (player != null && player.IsReady())
-            {
-                MsgInt mdata = new MsgInt();
-                mdata.value = player.player_id;   // 发送玩家ID
-                SendToAll(GameAction.PlayerReady, mdata, NetworkDelivery.Reliable);
-            }
-        }
-
-        /// <summary>
         /// 强制刷新整个游戏状态（同步完整 GameData）
         /// </summary>
-        public virtual void RefreshAll()
+        public void RefreshAll()
         {
-            MsgRefreshAll mdata = new MsgRefreshAll();
-            mdata.game_data = GetGameData();  // 当前完整游戏数据
+            MsgRefreshAll mdata = new()
+            {
+                game_data = GetGameData()  // 当前完整游戏数据
+            };
             SendToAll(GameAction.RefreshAll, mdata, NetworkDelivery.ReliableFragmentedSequenced);
         }
 
         /// <summary>
+        /// 通知所有客户端：某个玩家已准备
+        /// </summary>
+        private void SendPlayerReady(Player player)
+        {
+            if (player == null || !player.IsReady()) return;
+
+            MsgInt mdata = new()
+            {
+                value = player.player_id   // 发送玩家ID
+            };
+            SendToAll(GameAction.PlayerReady, mdata, NetworkDelivery.Reliable);
+        }
+
+
+        /// <summary>
         /// 仅发送一个指令 Tag（无额外数据）
         /// </summary>
-        public void SendToAll(ushort tag)
+        private void SendToAll(ushort tag)
         {
-            FastBufferWriter writer = new FastBufferWriter(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
+            FastBufferWriter writer = new(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
             writer.WriteValueSafe(tag);   // 写入消息类型
-            foreach (ClientData iclient in connected_clients)
+            foreach (ClientData iclient in connectedClients)
             {
                 if (iclient != null)
                 {
@@ -1073,12 +630,12 @@ namespace TcgEngine.Server
         /// <summary>
         /// 发送带网络序列化数据的消息给所有客户端
         /// </summary>
-        public void SendToAll(ushort tag, INetworkSerializable data, NetworkDelivery delivery)
+        private void SendToAll(ushort tag, INetworkSerializable data, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new FastBufferWriter(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
+            FastBufferWriter writer = new(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
             writer.WriteValueSafe(tag);          // 写消息类型
             writer.WriteNetworkSerializable(data); // 写数据内容
-            foreach (ClientData iclient in connected_clients)
+            foreach (ClientData iclient in connectedClients)
             {
                 if (iclient != null)
                 {
@@ -1088,25 +645,508 @@ namespace TcgEngine.Server
             writer.Dispose();
         }
 
-        /// <summary>
-        /// 服务器唯一ID
-        /// </summary>
-        public ulong ServerID { get { return TcgNetwork.Get().ServerID; } }
+
+        private void RegisterCommandHandler(ushort tag, Action<ClientData, SerializedData> handler)
+        {
+            commandHandlers.Add(tag, handler);
+        }
+
+        // 连接阶段，若所有玩家已连接且准备完成则开始游戏
+        private void StartGameWhenReady()
+        {
+            if (gameData.state == GameState.Connecting
+                && gameData.AreAllPlayersConnected()
+                && gameData.AreAllPlayersReady())
+            {
+                StartGame();
+            }
+        }
+        
+        private void UpdateGameLifecycle(float deltaTime)
+        {
+            int connectedPlayers = gameData.CountConnectedPlayers();
+
+            if (connectedPlayers == 0 || HasGameEnded())
+            {
+                expiration += deltaTime;
+            } else
+            {
+                expiration = 0f;
+            }
+
+            if (isDedicatedServer && connectedPlayers == 1 && gameData.IsPlaying())
+            {
+                winExpiration += deltaTime;
+            } else
+            {
+                winExpiration = 0f;
+            }
+
+            if (winExpiration >= winExpireTime)
+            {
+                foreach (Player player in gameData.players)
+                {
+                    if (player.IsConnected())
+                    {
+                        gameplay.EndGame(player.player_id);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 游戏进行中的回合计时
+        private void UpdateTurnTimer(float deltaTime)
+        {
+            if (gameData.state == GameState.Play && !gameplay.IsResolving())
+            {
+                gameData.turn_timer -= deltaTime;
+                if (gameData.turn_timer <= 0f)
+                {
+                    gameplay.NextStep();
+                }
+            }
+        }
+
+        private void ProcessNextPendingCommand()
+        {
+            if (pendingCommands.Count > 0 && !gameplay.IsResolving())
+            {
+                PendingClientCommand command = pendingCommands.Dequeue();
+                ExecuteCommand(command.type, command.client, command.sdata);
+            }
+        }
+
+        private void StartGame()
+        {
+            CreateAiForGame();
+            gameplay.StartGame();
+        }
+
+        private void CreateAiForGame()
+        {
+            bool ai_vs_ai = !isDedicatedServer && GameplayData.Get().ai_vs_ai;
+            foreach (Player player in gameData.players)
+            {
+                if (player.is_ai || ai_vs_ai)
+                {
+                    AIPlayer aiPlayer = AIPlayer.Create(
+                        GameplayData.Get().ai_type,
+                        gameplay,
+                        player.player_id,
+                        player.ai_level
+                    );
+                    aiPlayers.Add(aiPlayer);
+                }
+            }
+        }
+
+
+        #region command handlers
+        private async void ReceivePlayerSettings(ClientData iclient, SerializedData sdata)
+        {
+            PlayerSettings msg = sdata.Get<PlayerSettings>();
+            Player player = GetPlayer(iclient);
+            if (player == null || msg == null) return;
+
+            Player readyPlayer = await SetPlayerSettingsAsync(player.player_id, msg);
+            if (readyPlayer == null) return;
+
+            SendPlayerReady(readyPlayer);
+            RefreshAll();   // 通知所有客户端刷新 UI / 数据
+        }
+
+        private async void ReceivePlayerSettingsForAI(ClientData iclient, SerializedData sdata)
+        {
+            PlayerSettings msg = sdata.Get<PlayerSettings>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null)
+            {
+                await SetPlayerSettingsAIAsync(player.player_id, msg);
+            }
+        }
+
+        // 接收客户端发送的游戏配置（只在连接阶段有效）
+        private void ReceiveGameplaySettings(ClientData iclient, SerializedData sdata)
+        {
+            GameSettings settings = sdata.Get<GameSettings>();
+            if (settings != null)
+            {
+                SetGameSettings(settings);
+            }
+        }
+
+        // 接收“打出卡牌”请求
+        private void ReceivePlayCard(ClientData iclient, SerializedData sdata)
+        {
+            MsgPlayCard msg = sdata.Get<MsgPlayCard>();
+            Player player = GetPlayer(iclient);
+            // 必须：玩家存在 + 消息有效 + 当前轮到该玩家行动 + 不能在结算中
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            {
+                Card card = player.GetCard(msg.card_uid);
+                // 校验卡牌存在且属于该玩家，防止作弊
+                if (card != null && card.player_id == player.player_id)
+                    gameplay.PlayCard(card, msg.slot);
+            }
+        }
+
+        // 接收“攻击目标卡牌”请求
+        private void ReceiveAttackTarget(ClientData iclient, SerializedData sdata)
+        {
+            MsgAttack msg = sdata.Get<MsgAttack>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            {
+                Card attacker = player.GetCard(msg.attacker_uid);
+                Card target = gameData.GetCard(msg.target_uid);
+                // 攻击者必须属于该玩家
+                if (attacker != null && target != null && attacker.player_id == player.player_id)
+                {
+                    gameplay.AttackTarget(attacker, target);
+                }
+            }
+        }
+
+        // 接收“攻击玩家”请求
+        private void ReceiveAttackPlayer(ClientData iclient, SerializedData sdata)
+        {
+            MsgAttackPlayer msg = sdata.Get<MsgAttackPlayer>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            {
+                Card attacker = player.GetCard(msg.attacker_uid);
+                Player target = gameData.GetPlayer(msg.target_id);
+                if (attacker != null && target != null && attacker.player_id == player.player_id)
+                {
+                    gameplay.AttackPlayer(attacker, target);
+                }
+            }
+        }
+
+        // 接收“移动卡牌位置”请求
+        private void ReceiveMove(ClientData iclient, SerializedData sdata)
+        {
+            MsgPlayCard msg = sdata.Get<MsgPlayCard>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            {
+                Card card = player.GetCard(msg.card_uid);
+                if (card != null && card.player_id == player.player_id)
+                    gameplay.MoveCard(card, msg.slot);
+            }
+        }
+
+        // 接收“施放卡牌技能”请求
+        private void ReceiveCastCardAbility(ClientData iclient, SerializedData sdata)
+        {
+            MsgCastAbility msg = sdata.Get<MsgCastAbility>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerActionTurn(player) && !gameplay.IsResolving())
+            {
+                Card card = player.GetCard(msg.caster_uid);
+                AbilityData iability = AbilityData.Get(msg.ability_id);
+                if (card != null && card.player_id == player.player_id)
+                    gameplay.CastAbility(card, iability);
+            }
+        }
+
+        // 接收“选择卡牌”请求（用于选择阶段）
+        private void ReceiveSelectCard(ClientData iclient, SerializedData sdata)
+        {
+            MsgCard msg = sdata.Get<MsgCard>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            {
+                Card target = gameData.GetCard(msg.card_uid);
+                gameplay.SelectCard(target);
+            }
+        }
+
+        // 接收“选择玩家”请求
+        private void ReceiveSelectPlayer(ClientData iclient, SerializedData sdata)
+        {
+            MsgPlayer msg = sdata.Get<MsgPlayer>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            {
+                Player target = gameData.GetPlayer(msg.player_id);
+                gameplay.SelectPlayer(target);
+            }
+        }
+
+        // 接收“选择格子位置”请求
+        private void ReceiveSelectSlot(ClientData iclient, SerializedData sdata)
+        {
+            Slot slot = sdata.Get<Slot>();
+            Player player = GetPlayer(iclient);
+            if (player != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            {
+                // slot 校验有效性
+                if(gameData.Board.Contains(slot))
+                    gameplay.SelectSlot(slot);
+            }
+        }
+
+        // 接收“选择某个选项（数字型）”请求
+        private void ReceiveSelectChoice(ClientData iclient, SerializedData sdata)
+        {
+            MsgInt msg = sdata.Get<MsgInt>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            {
+                gameplay.SelectChoice(msg.value);
+            }
+        }
+
+        // 接收“选择费用”请求
+        private void ReceiveSelectCost(ClientData iclient, SerializedData sdata)
+        {
+            MsgInt msg = sdata.Get<MsgInt>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            {
+                gameplay.SelectCost(msg.value);
+            }
+        }
+
+        // 接收“取消选择”请求
+        private void ReceiveCancelSelection(ClientData iclient, SerializedData sdata)
+        {
+            Player player = GetPlayer(iclient);
+            if (player != null && gameplay.Rules.IsPlayerSelectorTurn(player) && !gameplay.IsResolving())
+            {
+                gameplay.CancelSelection();
+            }
+        }
+
+        // 接收“调度牌（换牌阶段 Mulligan）”请求
+        private void ReceiveSelectMulligan(ClientData iclient, SerializedData sdata)
+        {
+            MsgMulligan msg = sdata.Get<MsgMulligan>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null && gameplay.Rules.IsPlayerMulliganTurn(player) && !gameplay.IsResolving())
+            {
+                gameplay.Mulligan(player, msg.cards);
+            }
+        }
+
+        // 接收“结束回合”请求
+        private void ReceiveEndTurn(ClientData iclient, SerializedData sdata)
+        {
+            Player player = GetPlayer(iclient);
+            if (player != null && gameplay.Rules.IsPlayerTurn(player))
+            {
+                gameplay.NextStep();
+            }
+        }
+
+        // 接收“投降”请求
+        private void ReceiveResign(ClientData iclient, SerializedData sdata)
+        {
+            Player player = GetPlayer(iclient);
+            // 游戏必须已开始且未结束
+            if (player != null && gameData.state != GameState.Connecting && gameData.state != GameState.GameEnded)
+            {
+                // 认输则对方直接获胜
+                int winner = player.player_id == 0 ? 1 : 0;
+                gameplay.EndGame(winner);
+            }
+        }
+
+        // 接收聊天消息（强制绑定 sender，防止伪造 player_id）
+        private void ReceiveChat(ClientData iclient, SerializedData sdata)
+        {
+            MsgChat msg = sdata.Get<MsgChat>();
+            Player player = GetPlayer(iclient);
+            if (player != null && msg != null)
+            {
+                msg.player_id = player.player_id; // 强制覆盖，防止伪造身份
+                SendToAll(GameAction.ChatMessage, msg, NetworkDelivery.Reliable);
+            }
+        }
+        #endregion
+
+        #region 准备操作
+
+        private async Task<bool> SetPlayerDeckAsync(int playerId, string username, UserDeckData deck)
+        {
+            Player player = gameData.GetPlayer(playerId);
+            // 只有在房间还处于 Connecting 阶段时才能设置卡组
+            if (player == null || gameData.state != GameState.Connecting)
+                return false;
+
+            if (deck == null || string.IsNullOrEmpty(deck.tid))
+            {
+                Debug.Log("Player " + playerId + " submitted an empty deck");
+                return false;
+            }
+
+            // 1.测试模式，直接信任客户端传过来的卡组
+            if (Authenticator.Get().IsTest())
+            {
+                gameplay.SetPlayerDeck(player, deck);
+                return true;
+            }
+
+            // 2.在用户卡组中搜索
+            UserData user = await LoadUserDataAsync(username);
+
+            // API 请求返回时，对局可能已经离开 Connecting 阶段，需要再次确认
+            player = gameData.GetPlayer(playerId);
+            if (player == null || gameData.state != GameState.Connecting)
+                return false;
+
+            UserDeckData ownedDeck = user?.GetDeck(deck.tid);
+            if (user != null && ownedDeck != null)
+                return TryApplyOwnedDeck(player, user, ownedDeck);
+
+            // 3.在游戏预设卡组搜索
+            return TryApplyBuiltInDeck(player, deck.tid);
+        }
 
         /// <summary>
-        /// 网络消息系统
+        /// 设置真实玩家（人类玩家）的配置
+        /// 只能在 Connecting 阶段执行
+        /// 设置头像、卡背、卡组，并标记为 ready
         /// </summary>
-        public NetworkMessaging Messaging { get { return TcgNetwork.Get().Messaging; } }
+        private async Task<Player> SetPlayerSettingsAsync(int player_id, PlayerSettings psettings)
+        {
+            if (gameData.state != GameState.Connecting || psettings == null)
+            {
+                return null;
+            }
+
+            Player player = gameData.GetPlayer(player_id);
+            if (player == null || player.ready || !playersSettingUp.Add(player_id))
+            {
+                return null;
+            }
+
+            try
+            {
+                bool deckSet = await SetPlayerDeckAsync(player_id, player.username, psettings.deck);
+                if (!deckSet || gameData.state != GameState.Connecting)
+                {
+                    return null;
+                }
+            
+                player.avatar = psettings.avatar;       // 玩家头像
+                player.cardback = psettings.cardback;   // 卡背皮肤
+                player.is_ai = false;                   // 明确标记为真人玩家
+                player.ready = true;                    // 卡组校验完成后才允许进入 Ready
+                return player;
+            }
+            finally
+            {
+                playersSettingUp.Remove(player_id);
+            }
+        }
+
+        /// <summary>
+        /// 设置 AI 玩家配置
+        /// 只能在 Connecting 阶段执行
+        /// 服务器模式下禁止 AI（只能本地游戏用）
+        /// 设置 AI 名字、头像、卡组、难度，并设为 ready
+        /// </summary>
+        public async Task<bool> SetPlayerSettingsAIAsync(int player_id, PlayerSettings psettings)
+        {
+            if (gameData.state != GameState.Connecting || psettings == null)
+                return false; // 游戏已开始，不能设置
+
+            if (isDedicatedServer)
+                return false; // 专用服务器上不允许 AI
+
+            // AI 作为“对手玩家”加入
+            Player player = gameData.GetOpponentPlayer(player_id);
+            if (player == null || player.ready || !playersSettingUp.Add(player.player_id))
+                return false;
+
+            try
+            {
+                bool deck_set = await SetPlayerDeckAsync(player.player_id, psettings.username, psettings.deck);
+                if (!deck_set || gameData.state != GameState.Connecting)
+                    return false;
+
+                player.username = psettings.username;   // AI 名字
+                player.avatar = psettings.avatar;       // AI 头像
+                player.cardback = psettings.cardback;   // AI 卡背
+                player.is_ai = true;                    // 标记为 AI
+                player.ai_level = psettings.ai_level;   // AI 难度
+                player.ready = true;                    // 卡组设置完成后 AI 才就绪
+
+                SendPlayerReady(player);
+                RefreshAll();   // 通知客户端刷新
+                return true;
+            }
+            finally
+            {
+                playersSettingUp.Remove(player.player_id);
+            }
+        }
+
+        /// <summary>
+        /// 设置游戏规则 / 游戏参数（回合时间、生命值等）
+        /// 只能在游戏开始前（Connecting 阶段）修改
+        /// </summary>
+        public void SetGameSettings(GameSettings settings)
+        {
+            if (gameData.state == GameState.Connecting)
+            {
+                gameData.settings = settings;  // 更新游戏设置
+                RefreshAll();                  // 广播刷新
+            }
+        }
+
+        private async Task<UserData> LoadUserDataAsync(string username)
+        {
+            UserData user = null;
+            // 默认：离线模式，从本地 Authenticator 获取用户数据
+            if (!Authenticator.Get().IsApi())
+            {
+                user = Authenticator.Get().UserData;
+            } else  // 如果是在线模式，通过 API 拉取真实用户数据（校验）
+            {
+                user = await ApiClient.Get().LoadUserData(username);
+            }
+
+            return user;
+        }
+
+        private bool TryApplyOwnedDeck(Player player, UserData user, UserDeckData ownedDeck)
+        {
+            if (user.IsDeckValid(ownedDeck))
+            {
+                gameplay.SetPlayerDeck(player, ownedDeck);
+                return true;
+            } else
+            {
+                Debug.Log(user.username + " deck is invalid: " + ownedDeck.title);
+                return false;
+            }
+        }
+
+        private bool TryApplyBuiltInDeck(Player player, string deckId)
+        {
+            DeckData deck = DeckData.Get(deckId);
+            if (deck != null)
+            {
+                gameplay.SetPlayerDeck(player, deck);
+                return true;
+            } else
+            {
+                Debug.Log("Player " + player.player_id+ " deck not found: " + deckId);
+                return false;
+            }
+        }
+
+        #endregion
     }
 
-    /// <summary>
-    /// 排队中的游戏指令结构（服务器队列用）
-    /// </summary>
-    public struct QueuedGameAction
+    public struct PendingClientCommand
     {
         public ushort type;        // 指令类型
         public ClientData client;  // 发起该指令的客户端
         public SerializedData sdata; // 序列化后的数据
     }
-
 }

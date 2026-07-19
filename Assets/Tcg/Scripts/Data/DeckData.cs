@@ -12,11 +12,7 @@ namespace TcgEngine
     public class DeckData : ScriptableObject
     {
         public string id; // 套牌唯一ID
-
-        [Header("Display")]
         public string title; // 套牌显示标题
-
-        [Header("Cards")]
         public CardData hero; // 套牌中的英雄卡
         public CardData[] cards; // 套牌中的其他卡牌列表
 

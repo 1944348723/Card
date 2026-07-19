@@ -1,8 +1,5 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using System;
-using UnityEngine.Events;
 using Unity.Netcode;
 
 namespace TcgEngine.Server
@@ -188,7 +185,7 @@ namespace TcgEngine.Server
             {
                 GameServer gserver = GetGame(client.game_uid);
                 if (gserver != null && gserver.IsConnectedPlayer(client.user_id))
-                    gserver.ReceiveAction(client_id, reader);
+                    gserver.ReceiveCommand(client_id, reader);
             }
         }
 
@@ -205,7 +202,7 @@ namespace TcgEngine.Server
             if (gserver == null)
                 gserver = CreateGame(game_uid, nb_players);
 
-            bool can_connect = gserver.IsPlayer(user_id) || gserver.CountPlayers() < gserver.nb_players;
+            bool can_connect = gserver.IsPlayer(user_id) || gserver.CountPlayers() < gserver.playersCount;
             if (gserver != null && can_connect)
             {
                 // 设置客户端数据
@@ -272,7 +269,7 @@ namespace TcgEngine.Server
         public GameServer CreateGame(string uid, int nb_players)
         {
             GameServer game = new GameServer(uid, nb_players, true);
-            game_list[game.game_uid] = game;
+            game_list[game.gameUID] = game;
             return game;
         }
 
@@ -322,12 +319,5 @@ namespace TcgEngine.Server
         public string game_uid; // 玩家所属游戏 UID
 
         public ClientData(ulong id) { client_id = id; }
-    }
-
-    // -------------------- 命令事件 --------------------
-    public class CommandEvent
-    {
-        public ushort tag; // 命令类型标识
-        public UnityAction<ClientData, SerializedData> callback; // 命令回调函数
     }
 }

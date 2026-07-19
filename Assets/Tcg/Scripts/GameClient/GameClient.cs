@@ -287,7 +287,7 @@ namespace TcgEngine.Client
 
         public void SendPlayerSettingsAI(PlayerSettings psettings)
         {
-            SendAction(GameAction.PlayerSettingsAI, psettings, NetworkDelivery.ReliableFragmentedSequenced);
+            SendAction(GameAction.PlayerSettingsForAI, psettings, NetworkDelivery.ReliableFragmentedSequenced);
             // 发送AI玩家设置
         }
 

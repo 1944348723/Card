@@ -90,8 +90,7 @@ namespace TcgEngine
             board = BoardLayout.CreateDefault(nb_players);
         }
 
-        // 判断是否所有玩家准备就绪
-        public virtual bool AreAllPlayersReady()
+        public bool AreAllPlayersReady()
         {
             foreach (Player player in players)
             {
@@ -103,8 +102,7 @@ namespace TcgEngine
             return true;
         }
 
-        // 判断是否所有玩家已连接
-        public virtual bool AreAllPlayersConnected()
+        public bool AreAllPlayersConnected()
         {
             foreach (Player player in players)
             {
@@ -114,6 +112,17 @@ namespace TcgEngine
                 }
             }
             return true;
+        }
+
+        public int CountConnectedPlayers()
+        {
+            int count = 0;
+            foreach (Player player in players)
+            {
+                if (player.IsConnected())
+                    count++;
+            }
+            return count;
         }
 
         // 根据玩家ID获取玩家对象
@@ -343,6 +352,11 @@ namespace TcgEngine
             return state == GameState.GameEnded;
         }
 
+        public bool IsPlaying()
+        {
+            return state == GameState.Play;
+        }
+
         // 克隆游戏对象并生成新实例（速度较慢）
         public static Game CloneNew(Game source)
         {
@@ -425,9 +439,9 @@ namespace TcgEngine
     {
         None = 0,
         Mulligan = 5,   // 握手阶段/换牌阶段
-        StartTurn = 10, // 回合开始阶段
+        StartTurn = 10, // 回合开始阶段，无法操作
         Main = 20,      // 主游戏阶段
-        EndTurn = 30,   // 回合结束阶段
+        EndTurn = 30,   // 回合结束阶段，无法操作
     }
 
     // 选择器类型枚举（用于选择目标、卡牌或其他操作）

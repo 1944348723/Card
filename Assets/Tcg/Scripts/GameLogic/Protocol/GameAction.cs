@@ -27,7 +27,7 @@ namespace TcgEngine
         public const ushort ChatMessage = 1090;    // 聊天信息
 
         public const ushort PlayerSettings = 1100;   // 连接后发送玩家数据
-        public const ushort PlayerSettingsAI = 1102; // AI玩家数据
+        public const ushort PlayerSettingsForAI = 1102; // AI玩家数据
         public const ushort GameSettings = 1105;     // 连接后发送游戏设置
 
         // ----- 服务器发送到客户端的刷新 -----

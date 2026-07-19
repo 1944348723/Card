@@ -423,14 +423,6 @@ namespace TcgEngine
 
         public UserDeckData() {}
 
-        public UserDeckData(string tid, string title)
-        {
-            this.tid = tid;
-            this.title = title;
-            hero = new UserCardData();
-            cards = new UserCardData[0];
-        }
-
         public UserDeckData(DeckData deck)
         {
             tid = deck.id;
