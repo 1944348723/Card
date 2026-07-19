@@ -14,7 +14,7 @@ namespace TcgEngine.Server
     /// 联机时服务器上会为每一场对局创建一个 GameServer
     /// 负责接收指令、同步游戏状态、运行 AI
     /// </summary>
-    public class GameServer
+    public class GameServer : IDisposable
     {
         public string gameUID; // 游戏唯一ID
         public int playersCount = 2;
@@ -27,6 +27,7 @@ namespace TcgEngine.Server
         private float expiration = 0f;
         private float winExpiration = 0f;
         private bool isDedicatedServer = false;
+        private bool isDisposed = false;
 
         private List<ClientData> players = new();            // 只包含玩家（不包含观察者），断线后仍保留在数组中，只有玩家可以发送指令
         private List<ClientData> connectedClients = new();  // 包含所有已连接客户端（包括观察者），断线会移除，所有人都会接收刷新数据
@@ -44,8 +45,11 @@ namespace TcgEngine.Server
             Init(uid, players, online);
         }
 
-        ~GameServer()
+        public void Dispose()
         {
+            if (isDisposed) return;
+
+            isDisposed = true;
             Clear();
         }
 
@@ -139,13 +143,23 @@ namespace TcgEngine.Server
             gameplay.onAttackPlayerEnd -= OnAttackPlayerEnd;
             gameplay.onCardDamaged -= OnCardDamaged;
             gameplay.onPlayerDamaged -= OnPlayerDamaged;
+            gameplay.onCardHealed -= OnCardHealed;
+            gameplay.onPlayerHealed -= OnPlayerHealed;
 
             gameplay.onSecretTrigger -= OnSecretTriggered;
             gameplay.onSecretResolve -= OnSecretResolved;
+
+            pendingCommands.Clear();
+            playersSettingUp.Clear();
+            aiPlayers.Clear();
+            connectedClients.Clear();
+            players.Clear();
         }
 
         public void Update()
         {
+            if (isDisposed) return;
+
             StartGameWhenReady();
             UpdateGameLifecycle(Time.deltaTime);
             UpdateTurnTimer(Time.deltaTime);
@@ -161,6 +175,8 @@ namespace TcgEngine.Server
 
         public void ReceiveCommand(ulong client_id, FastBufferReader reader)
         {
+            if (isDisposed) return;
+
             ClientData client = GetClient(client_id);
             if (client == null) return;
 
@@ -973,7 +989,7 @@ namespace TcgEngine.Server
         {
             Player player = gameData.GetPlayer(playerId);
             // 只有在房间还处于 Connecting 阶段时才能设置卡组
-            if (player == null || gameData.state != GameState.Connecting)
+            if (isDisposed || player == null || gameData.state != GameState.Connecting)
                 return false;
 
             if (deck == null || string.IsNullOrEmpty(deck.tid))
@@ -994,7 +1010,7 @@ namespace TcgEngine.Server
 
             // API 请求返回时，对局可能已经离开 Connecting 阶段，需要再次确认
             player = gameData.GetPlayer(playerId);
-            if (player == null || gameData.state != GameState.Connecting)
+            if (isDisposed || player == null || gameData.state != GameState.Connecting)
                 return false;
 
             UserDeckData ownedDeck = user?.GetDeck(deck.tid);
@@ -1012,7 +1028,7 @@ namespace TcgEngine.Server
         /// </summary>
         private async Task<Player> SetPlayerSettingsAsync(int player_id, PlayerSettings psettings)
         {
-            if (gameData.state != GameState.Connecting || psettings == null)
+            if (isDisposed || gameData.state != GameState.Connecting || psettings == null)
             {
                 return null;
             }
@@ -1026,7 +1042,7 @@ namespace TcgEngine.Server
             try
             {
                 bool deckSet = await SetPlayerDeckAsync(player_id, player.username, psettings.deck);
-                if (!deckSet || gameData.state != GameState.Connecting)
+                if (isDisposed || !deckSet || gameData.state != GameState.Connecting)
                 {
                     return null;
                 }
@@ -1051,7 +1067,7 @@ namespace TcgEngine.Server
         /// </summary>
         public async Task<bool> SetPlayerSettingsAIAsync(int player_id, PlayerSettings psettings)
         {
-            if (gameData.state != GameState.Connecting || psettings == null)
+            if (isDisposed || gameData.state != GameState.Connecting || psettings == null)
                 return false; // 游戏已开始，不能设置
 
             if (isDedicatedServer)
@@ -1065,7 +1081,7 @@ namespace TcgEngine.Server
             try
             {
                 bool deck_set = await SetPlayerDeckAsync(player.player_id, psettings.username, psettings.deck);
-                if (!deck_set || gameData.state != GameState.Connecting)
+                if (isDisposed || !deck_set || gameData.state != GameState.Connecting)
                     return false;
 
                 player.username = psettings.username;   // AI 名字

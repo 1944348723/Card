@@ -61,6 +61,9 @@ namespace TcgEngine.Server
                 network.Messaging.UnListenMsg("connect");
                 network.Messaging.UnListenMsg("action");
             }
+
+            server?.Dispose();
+            server = null;
         }
 
         // -------------------- 客户端连接/断开 --------------------

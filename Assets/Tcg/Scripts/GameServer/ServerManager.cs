@@ -55,6 +55,24 @@ namespace TcgEngine.Server
             Login();
         }
 
+        protected virtual void OnDestroy()
+        {
+            TcgNetwork network = TcgNetwork.Get();
+            if (network != null)
+            {
+                network.onClientJoin -= OnClientConnected;
+                network.onClientQuit -= OnClientDisconnected;
+                Messaging.UnListenMsg("connect");
+                Messaging.UnListenMsg("action");
+            }
+
+            foreach (GameServer game in game_list.Values)
+            {
+                game.Dispose();
+            }
+            game_list.Clear();
+        }
+
         protected virtual void Update()
         {
             // 更新所有游戏并移除没有玩家的游戏
@@ -71,7 +89,7 @@ namespace TcgEngine.Server
             // 移除过期游戏
             foreach (string key in game_remove_list)
             {
-                game_list.Remove(key);
+                RemoveGame(key);
 
                 // 如果使用匹配系统，结束匹配
                 if (ServerMatchmaker.Get())
@@ -275,7 +293,11 @@ namespace TcgEngine.Server
 
         public void RemoveGame(string game_id)
         {
+            if (!game_list.TryGetValue(game_id, out GameServer game))
+                return;
+
             game_list.Remove(game_id);
+            game.Dispose();
         }
 
         public GameServer GetGame(string game_uid)
