@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
@@ -17,12 +16,12 @@ namespace TcgEngine
     public class NetworkMessaging
     {
         // 网络系统核心对象
-        private TcgNetwork network;
+        private readonly TcgNetwork network;
 
         // 保存消息类型与回调函数的映射表
         // key = 消息类型字符串
         // value = 当该类型消息到达时触发的回调
-        private Dictionary<string, System.Action<ulong, FastBufferReader>> msg_dict = new Dictionary<string, System.Action<ulong, FastBufferReader>>();
+        private readonly Dictionary<string, System.Action<ulong, FastBufferReader>> messageHandlers = new();
 
         public NetworkMessaging(TcgNetwork network)
         {
@@ -36,9 +35,9 @@ namespace TcgEngine
         // 重新注册之前已经监听过的所有消息类型
         private void OnConnect()
         {
-            foreach (KeyValuePair<string, System.Action<ulong, FastBufferReader>> pair in msg_dict)
+            foreach (string messageType in messageHandlers.Keys)
             {
-                RegisterNetMsg(pair.Key, pair.Value);
+                RegisterNetMsg(messageType);
             }
         }
 
@@ -49,8 +48,14 @@ namespace TcgEngine
         /// </summary>
         public void ListenMsg(string type, System.Action<ulong, FastBufferReader> callback)
         {
-            msg_dict[type] = callback;
-            RegisterNetMsg(type, callback);
+            if (string.IsNullOrWhiteSpace(type) || callback == null)
+            {
+                Debug.LogError("Cannot register a network message handler with an empty type or callback.");
+                return;
+            }
+
+            messageHandlers[type] = callback;
+            RegisterNetMsg(type);
         }
 
         /// <summary>
@@ -58,7 +63,10 @@ namespace TcgEngine
         /// </summary>
         public void UnListenMsg(string type)
         {
-            msg_dict.Remove(type);
+            if (string.IsNullOrWhiteSpace(type))
+                return;
+
+            messageHandlers.Remove(type);
 
             if (network.NetworkManager.CustomMessagingManager != null)
                 network.NetworkManager.CustomMessagingManager.UnregisterNamedMessageHandler(type);
@@ -68,7 +76,7 @@ namespace TcgEngine
         /// 真正向 Netcode 注册监听
         /// 只有在网络在线时才允许注册
         /// </summary>
-        private void RegisterNetMsg(string type, System.Action<ulong, FastBufferReader> callback)
+        private void RegisterNetMsg(string type)
         {
             if (IsOnline)
             {
@@ -85,10 +93,24 @@ namespace TcgEngine
         /// </summary>
         private void ReceiveNetMessage(string type, ulong client_id, FastBufferReader reader)
         {
-            bool valid = msg_dict.TryGetValue(type, out System.Action<ulong, FastBufferReader> callback);
-            if (valid && IsOnline)
+            if (IsOnline)
+                InvokeMessageHandler(type, client_id, reader);
+        }
+
+        private void InvokeMessageHandler(string type, ulong clientId, FastBufferReader reader)
+        {
+            if (string.IsNullOrWhiteSpace(type)
+                || !messageHandlers.TryGetValue(type, out System.Action<ulong, FastBufferReader> handler))
+                return;
+
+            try
             {
-                callback(client_id, reader);
+                handler.Invoke(clientId, reader);
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError($"Failed to handle network message '{type}' from client {clientId}.");
+                Debug.LogException(exception);
             }
         }
 
@@ -440,12 +462,11 @@ namespace TcgEngine
         // 本质上是：把 writer 内容复制到 reader，然后直接触发本地 callback
         private void SendOffline(string type, FastBufferWriter writer)
         {
-            bool found = msg_dict.TryGetValue(type, out System.Action<ulong, FastBufferReader> callback);
-            if (found)
-            {
-                using FastBufferReader reader = new(writer, Allocator.Temp);
-                callback?.Invoke(ClientID, reader);
-            }
+            if (string.IsNullOrWhiteSpace(type) || !messageHandlers.ContainsKey(type))
+                return;
+
+            using FastBufferReader reader = new(writer, Allocator.Temp);
+            InvokeMessageHandler(type, ClientID, reader);
         }
 
 
