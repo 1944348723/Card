@@ -639,7 +639,7 @@ namespace TcgEngine.Server
         /// </summary>
         private void SendToAll(ushort tag)
         {
-            Messaging.SendTagged("refresh", connectedClientIds, tag, NetworkDelivery.Reliable);
+            Messaging.SendTagged(NetworkMessageName.Refresh, connectedClientIds, tag, NetworkDelivery.Reliable);
         }
 
         /// <summary>
@@ -647,7 +647,7 @@ namespace TcgEngine.Server
         /// </summary>
         private void SendToAll(ushort tag, INetworkSerializable data, NetworkDelivery delivery)
         {
-            Messaging.SendTagged("refresh", connectedClientIds, tag, data, delivery);
+            Messaging.SendTagged(NetworkMessageName.Refresh, connectedClientIds, tag, data, delivery);
         }
 
 

@@ -47,9 +47,9 @@ namespace TcgEngine.Server
             network.onClientQuit += OnClientDisconnected;
 
             // 注册匹配相关消息监听
-            Messaging.ListenMsg("matchmaking", ReceiveMatchmaking);          // 玩家请求匹配
-            Messaging.ListenMsg("matchmaking_list", ReceiveMatchmakingList); // 请求当前匹配列表
-            Messaging.ListenMsg("match_list", ReceiveMatchList);             // 请求当前已匹配对局列表
+            Messaging.ListenMsg(NetworkMessageName.Matchmaking, ReceiveMatchmaking);          // 玩家请求匹配
+            Messaging.ListenMsg(NetworkMessageName.MatchmakingList, ReceiveMatchmakingList); // 请求当前匹配列表
+            Messaging.ListenMsg(NetworkMessageName.MatchList, ReceiveMatchList);             // 请求当前已匹配对局列表
 
             // 如果网络未激活，则启动服务器
             if (!network.IsActive())
@@ -209,7 +209,7 @@ namespace TcgEngine.Server
             msg_match.game_uid = match != null ? match.game_uid : "";
             msg_match.server_url = match != null ? match.server_url : "";
 
-            Messaging.SendObject("matchmaking", iclient.client_id, msg_match, NetworkDelivery.Reliable);
+            Messaging.SendObject(NetworkMessageName.Matchmaking, iclient.client_id, msg_match, NetworkDelivery.Reliable);
         }
 
         // -------------------- 获取匹配列表 --------------------
@@ -234,7 +234,7 @@ namespace TcgEngine.Server
 
             MatchmakingList msg_list = new MatchmakingList();
             msg_list.items = items.ToArray();
-            Messaging.SendObject("matchmaking_list", client_id, msg_list, NetworkDelivery.Reliable);
+            Messaging.SendObject(NetworkMessageName.MatchmakingList, client_id, msg_list, NetworkDelivery.Reliable);
         }
 
         protected virtual void ReceiveMatchList(ulong client_id, FastBufferReader reader)
@@ -263,7 +263,7 @@ namespace TcgEngine.Server
             MatchList msg_list = new MatchList();
             msg_list.items = items.ToArray();
 
-            Messaging.SendObject("match_list", client_id, msg_list, NetworkDelivery.Reliable);
+            Messaging.SendObject(NetworkMessageName.MatchList, client_id, msg_list, NetworkDelivery.Reliable);
         }
 
         // -------------------- 工具方法 --------------------

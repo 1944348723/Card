@@ -120,7 +120,7 @@ namespace TcgEngine.Client
             RegisterRefresh(GameAction.RefreshAll, OnRefreshAll);
 
             TcgNetwork.Get().onConnect += OnConnectedServer;          // 服务器连接回调
-            TcgNetwork.Get().Messaging.ListenMsg("refresh", OnReceiveRefresh);  // 监听刷新消息
+            TcgNetwork.Get().Messaging.ListenMsg(NetworkMessageName.Refresh, OnReceiveRefresh);  // 监听刷新消息
 
             ConnectToAPI();     // 连接 API
             ConnectToServer();  // 连接游戏服务器
@@ -129,7 +129,7 @@ namespace TcgEngine.Client
         protected virtual void OnDestroy()
         {
             TcgNetwork.Get().onConnect -= OnConnectedServer;
-            TcgNetwork.Get().Messaging.UnListenMsg("refresh");
+            TcgNetwork.Get().Messaging.UnListenMsg(NetworkMessageName.Refresh);
         }
 
         protected virtual void Update()
@@ -234,7 +234,7 @@ namespace TcgEngine.Client
             nplayer.nb_players = game_settings.nb_players;  // 游戏玩家数量
             nplayer.observer = game_settings.game_type == GameType.Observer; // 是否为观战模式
 
-            Messaging.SendObject("connect", ServerID, nplayer, NetworkDelivery.Reliable); // 发送连接请求
+            Messaging.SendObject(NetworkMessageName.Connect, ServerID, nplayer, NetworkDelivery.Reliable); // 发送连接请求
         }
 
         public virtual void SendGameSettings()
@@ -420,17 +420,17 @@ namespace TcgEngine.Client
 
         public void SendAction<T>(ushort type, T data, NetworkDelivery delivery = NetworkDelivery.Reliable) where T : INetworkSerializable
         {
-            Messaging.SendTagged("action", ServerID, type, data, delivery);
+            Messaging.SendTagged(NetworkMessageName.Action, ServerID, type, data, delivery);
         }
 
         public void SendAction(ushort type, int data)
         {
-            Messaging.SendTagged("action", ServerID, type, data, NetworkDelivery.Reliable);
+            Messaging.SendTagged(NetworkMessageName.Action, ServerID, type, data, NetworkDelivery.Reliable);
         }
 
         public void SendAction(ushort type)
         {
-            Messaging.SendTagged("action", ServerID, type, NetworkDelivery.Reliable);
+            Messaging.SendTagged(NetworkMessageName.Action, ServerID, type, NetworkDelivery.Reliable);
         }
 
         //--- 接收刷新事件 ----------------------

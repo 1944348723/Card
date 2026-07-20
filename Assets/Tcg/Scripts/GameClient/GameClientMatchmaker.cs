@@ -35,9 +35,9 @@ namespace TcgEngine.Client
         {
             TcgNetwork.Get().onConnect += OnConnect;             // 注册连接事件
             TcgNetwork.Get().onDisconnect += OnDisconnect;       // 注册断开事件
-            Messaging.ListenMsg("matchmaking", ReceiveMatchmaking);        // 监听匹配结果消息
-            Messaging.ListenMsg("matchmaking_list", ReceiveMatchmakingList); // 监听匹配列表消息
-            Messaging.ListenMsg("match_list", ReceiveMatchList);             // 监听比赛列表消息
+            Messaging.ListenMsg(NetworkMessageName.Matchmaking, ReceiveMatchmaking);        // 监听匹配结果消息
+            Messaging.ListenMsg(NetworkMessageName.MatchmakingList, ReceiveMatchmakingList); // 监听匹配列表消息
+            Messaging.ListenMsg(NetworkMessageName.MatchList, ReceiveMatchList);             // 监听比赛列表消息
         }
 
         private void OnDestroy()
@@ -48,9 +48,9 @@ namespace TcgEngine.Client
             {
                 TcgNetwork.Get().onConnect -= OnConnect;
                 TcgNetwork.Get().onDisconnect -= OnDisconnect;
-                Messaging.UnListenMsg("matchmaking");
-                Messaging.UnListenMsg("matchmaking_list");
-                Messaging.UnListenMsg("match_list");
+                Messaging.UnListenMsg(NetworkMessageName.Matchmaking);
+                Messaging.UnListenMsg(NetworkMessageName.MatchmakingList);
+                Messaging.UnListenMsg(NetworkMessageName.MatchList);
             }
         }
 
@@ -209,7 +209,7 @@ namespace TcgEngine.Client
             msg_match.elo = udata.elo;
             msg_match.time = match_timer;
             msg_match.refresh = refresh;
-            Messaging.SendObject("matchmaking", ServerID, msg_match, NetworkDelivery.Reliable);
+            Messaging.SendObject(NetworkMessageName.Matchmaking, ServerID, msg_match, NetworkDelivery.Reliable);
         }
 
         /// <summary>
@@ -219,7 +219,7 @@ namespace TcgEngine.Client
         {
             MsgMatchmakingList msg_match = new MsgMatchmakingList();
             msg_match.username = ""; // 返回所有用户
-            Messaging.SendObject("matchmaking_list", ServerID, msg_match, NetworkDelivery.Reliable);
+            Messaging.SendObject(NetworkMessageName.MatchmakingList, ServerID, msg_match, NetworkDelivery.Reliable);
         }
 
         /// <summary>
@@ -229,7 +229,7 @@ namespace TcgEngine.Client
         {
             MsgMatchmakingList msg_match = new MsgMatchmakingList();
             msg_match.username = username;
-            Messaging.SendObject("match_list", ServerID, msg_match, NetworkDelivery.Reliable);
+            Messaging.SendObject(NetworkMessageName.MatchList, ServerID, msg_match, NetworkDelivery.Reliable);
         }
 
         /// <summary>

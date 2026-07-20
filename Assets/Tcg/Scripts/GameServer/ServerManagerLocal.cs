@@ -40,8 +40,8 @@ namespace TcgEngine.Server
             network.onClientQuit += OnClientQuit;
 
             // 注册消息监听
-            network.Messaging.ListenMsg("connect", ReceiveConnectPlayer); // 玩家请求连接
-            network.Messaging.ListenMsg("action", ReceiveGameAction);     // 玩家发送动作
+            network.Messaging.ListenMsg(NetworkMessageName.Connect, ReceiveConnectPlayer); // 玩家请求连接
+            network.Messaging.ListenMsg(NetworkMessageName.Action, ReceiveGameAction);     // 玩家发送动作
 
             // 将本地客户端加入客户端列表
             client_list[network.ServerID] = new ClientData(network.ServerID); 
@@ -58,8 +58,8 @@ namespace TcgEngine.Server
             {
                 network.onClientJoin -= OnClientJoin;
                 network.onClientQuit -= OnClientQuit;
-                network.Messaging.UnListenMsg("connect");
-                network.Messaging.UnListenMsg("action");
+                network.Messaging.UnListenMsg(NetworkMessageName.Connect);
+                network.Messaging.UnListenMsg(NetworkMessageName.Action);
             }
 
             server?.Dispose();
@@ -161,7 +161,7 @@ namespace TcgEngine.Server
         // -------------------- 发送消息给客户端 --------------------
         public void SendToClient(ulong client_id, ushort tag, INetworkSerializable data, NetworkDelivery delivery)
         {
-            Messaging.SendTagged("refresh", client_id, tag, data, delivery);
+            Messaging.SendTagged(NetworkMessageName.Refresh, client_id, tag, data, delivery);
         }
 
         // -------------------- 客户端查询 --------------------

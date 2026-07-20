@@ -4,6 +4,21 @@ using UnityEngine.Events;
 
 namespace TcgEngine
 {
+    /// <summary>
+    /// Netcode Named Message 的协议名称。
+    /// 客户端与服务器必须使用同一名称进行注册和发送。
+    /// </summary>
+    public static class NetworkMessageName
+    {
+        public const string Connect = "connect";
+        public const string Action = "action";
+        public const string Refresh = "refresh";
+
+        public const string Matchmaking = "matchmaking";
+        public const string MatchmakingList = "matchmaking_list";
+        public const string MatchList = "match_list";
+    }
+
     //-------- 连接相关 --------
 
     // 玩家连接消息
