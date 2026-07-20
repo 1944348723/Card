@@ -207,6 +207,34 @@ namespace TcgEngine
         //---------------- 多个目标（群发 / 广播，仅服务器可用） ----------------
 
         /// <summary>
+        /// 向多个目标发送只包含协议标签的消息。
+        /// </summary>
+        public void SendTagged(string type, IReadOnlyList<ulong> targets, ushort tag, NetworkDelivery delivery)
+        {
+            if (!IsServer || targets == null || targets.Count == 0)
+                return;
+
+            using FastBufferWriter writer = new(128, Allocator.Temp, TcgNetwork.MsgSizeMax);
+            writer.WriteValueSafe(tag);
+            Send(type, targets, writer, delivery);
+        }
+
+        /// <summary>
+        /// 向多个目标发送协议标签和可网络序列化的载荷。
+        /// </summary>
+        public void SendTagged<T>(string type, IReadOnlyList<ulong> targets, ushort tag, T data, NetworkDelivery delivery)
+            where T : INetworkSerializable
+        {
+            if (!IsServer || targets == null || targets.Count == 0)
+                return;
+
+            using FastBufferWriter writer = new(128, Allocator.Temp, TcgNetwork.MsgSizeMax);
+            writer.WriteValueSafe(tag);
+            writer.WriteNetworkSerializable(data);
+            Send(type, targets, writer, delivery);
+        }
+
+        /// <summary>
         /// 群发空消息
         /// </summary>
         public void SendEmpty(string type, IReadOnlyList<ulong> targets, NetworkDelivery delivery)

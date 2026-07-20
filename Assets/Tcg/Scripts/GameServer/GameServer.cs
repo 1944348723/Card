@@ -31,6 +31,7 @@ namespace TcgEngine.Server
 
         private List<ClientData> players = new();            // 只包含玩家（不包含观察者），断线后仍保留在数组中，只有玩家可以发送指令
         private List<ClientData> connectedClients = new();  // 包含所有已连接客户端（包括观察者），断线会移除，所有人都会接收刷新数据
+        private readonly List<ulong> connectedClientIds = new(); // 与 connectedClients 同步，用于无临时分配的多目标广播
         private List<AIPlayer> aiPlayers = new();                // AI 玩家列表
         private Queue<PendingClientCommand> pendingCommands = new();
         private HashSet<int> playersSettingUp = new();         // 正在异步校验配置的玩家，防止重复提交
@@ -153,6 +154,7 @@ namespace TcgEngine.Server
             playersSettingUp.Clear();
             aiPlayers.Clear();
             connectedClients.Clear();
+            connectedClientIds.Clear();
             players.Clear();
         }
 
@@ -213,14 +215,21 @@ namespace TcgEngine.Server
         // 添加一个客户端到已连接列表（如果还没添加）
         public void AddClient(ClientData client)
         {
-            if (!connectedClients.Contains(client))
-                connectedClients.Add(client);
+            if (client == null || connectedClients.Contains(client))
+                return;
+
+            connectedClients.Add(client);
+            connectedClientIds.Add(client.client_id);
         }
 
         // 从已连接客户端列表中移除一个客户端
         public void RemoveClient(ClientData client)
         {
+            if (client == null)
+                return;
+
             connectedClients.Remove(client);
+            connectedClientIds.Remove(client.client_id);
 
             // 找到该客户端绑定的玩家
             Player player = GetPlayer(client);
@@ -630,17 +639,7 @@ namespace TcgEngine.Server
         /// </summary>
         private void SendToAll(ushort tag)
         {
-            FastBufferWriter writer = new(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
-            writer.WriteValueSafe(tag);   // 写入消息类型
-            foreach (ClientData iclient in connectedClients)
-            {
-                if (iclient != null)
-                {
-                    // 发送到每个在线客户端
-                    Messaging.Send("refresh", iclient.client_id, writer, NetworkDelivery.Reliable);
-                }
-            }
-            writer.Dispose();
+            Messaging.SendTagged("refresh", connectedClientIds, tag, NetworkDelivery.Reliable);
         }
 
         /// <summary>
@@ -648,17 +647,7 @@ namespace TcgEngine.Server
         /// </summary>
         private void SendToAll(ushort tag, INetworkSerializable data, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
-            writer.WriteValueSafe(tag);          // 写消息类型
-            writer.WriteNetworkSerializable(data); // 写数据内容
-            foreach (ClientData iclient in connectedClients)
-            {
-                if (iclient != null)
-                {
-                    Messaging.Send("refresh", iclient.client_id, writer, delivery);
-                }
-            }
-            writer.Dispose();
+            Messaging.SendTagged("refresh", connectedClientIds, tag, data, delivery);
         }
 
 
