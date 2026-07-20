@@ -161,11 +161,7 @@ namespace TcgEngine.Server
         // -------------------- 发送消息给客户端 --------------------
         public void SendToClient(ulong client_id, ushort tag, INetworkSerializable data, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new FastBufferWriter(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
-            writer.WriteValueSafe(tag);
-            writer.WriteNetworkSerializable(data);
-            Messaging.Send("refresh", client_id, writer, delivery);
-            writer.Dispose();
+            Messaging.SendTagged("refresh", client_id, tag, data, delivery);
         }
 
         // -------------------- 客户端查询 --------------------

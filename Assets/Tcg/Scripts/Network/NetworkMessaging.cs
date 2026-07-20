@@ -153,7 +153,7 @@ namespace TcgEngine
         /// </summary>
         public void SendFloat(string type, ulong target, float data, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new FastBufferWriter(4, Allocator.Temp);
+            FastBufferWriter writer = new(4, Allocator.Temp);
             writer.WriteValueSafe(data);
             Send(type, target, writer, delivery);
             writer.Dispose();
@@ -165,10 +165,43 @@ namespace TcgEngine
         /// </summary>
         public void SendObject<T>(string type, ulong target, T data, NetworkDelivery delivery) where T : INetworkSerializable
         {
-            FastBufferWriter writer = new FastBufferWriter(256, Allocator.Temp, TcgNetwork.MsgSizeMax);
+            FastBufferWriter writer = new(256, Allocator.Temp, TcgNetwork.MsgSizeMax);
             writer.WriteNetworkSerializable(data);
             Send(type, target, writer, delivery);
             writer.Dispose();
+        }
+
+        /// <summary>
+        /// 发送只包含协议标签的消息。
+        /// </summary>
+        public void SendTagged(string type, ulong target, ushort tag, NetworkDelivery delivery)
+        {
+            using FastBufferWriter writer = new(128, Allocator.Temp, TcgNetwork.MsgSizeMax);
+            writer.WriteValueSafe(tag);
+            Send(type, target, writer, delivery);
+        }
+
+        /// <summary>
+        /// 发送协议标签和可网络序列化的载荷。
+        /// </summary>
+        public void SendTagged<T>(string type, ulong target, ushort tag, T data, NetworkDelivery delivery)
+            where T : INetworkSerializable
+        {
+            using FastBufferWriter writer = new(128, Allocator.Temp, TcgNetwork.MsgSizeMax);
+            writer.WriteValueSafe(tag);
+            writer.WriteNetworkSerializable(data);
+            Send(type, target, writer, delivery);
+        }
+
+        /// <summary>
+        /// 发送协议标签和整数载荷。
+        /// </summary>
+        public void SendTagged(string type, ulong target, ushort tag, int data, NetworkDelivery delivery)
+        {
+            using FastBufferWriter writer = new(128, Allocator.Temp, TcgNetwork.MsgSizeMax);
+            writer.WriteValueSafe(tag);
+            writer.WriteValueSafe(data);
+            Send(type, target, writer, delivery);
         }
 
         //---------------- 多个目标（群发 / 广播，仅服务器可用） ----------------

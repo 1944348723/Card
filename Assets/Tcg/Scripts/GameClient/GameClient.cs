@@ -420,28 +420,17 @@ namespace TcgEngine.Client
 
         public void SendAction<T>(ushort type, T data, NetworkDelivery delivery = NetworkDelivery.Reliable) where T : INetworkSerializable
         {
-            FastBufferWriter writer = new FastBufferWriter(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
-            writer.WriteValueSafe(type);           // 写入动作类型
-            writer.WriteNetworkSerializable(data); // 写入序列化数据
-            Messaging.Send("action", ServerID, writer, delivery); // 发送到服务器
-            writer.Dispose();                       // 释放资源
+            Messaging.SendTagged("action", ServerID, type, data, delivery);
         }
 
         public void SendAction(ushort type, int data)
         {
-            FastBufferWriter writer = new FastBufferWriter(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
-            writer.WriteValueSafe(type); // 写入动作类型
-            writer.WriteValueSafe(data); // 写入整数数据
-            Messaging.Send("action", ServerID, writer, NetworkDelivery.Reliable); // 发送到服务器
-            writer.Dispose();
+            Messaging.SendTagged("action", ServerID, type, data, NetworkDelivery.Reliable);
         }
 
         public void SendAction(ushort type)
         {
-            FastBufferWriter writer = new FastBufferWriter(128, Unity.Collections.Allocator.Temp, TcgNetwork.MsgSizeMax);
-            writer.WriteValueSafe(type); // 写入动作类型
-            Messaging.Send("action", ServerID, writer, NetworkDelivery.Reliable); // 发送到服务器
-            writer.Dispose();
+            Messaging.SendTagged("action", ServerID, type, NetworkDelivery.Reliable);
         }
 
         //--- 接收刷新事件 ----------------------
