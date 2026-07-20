@@ -99,9 +99,8 @@ namespace TcgEngine
         /// </summary>
         public void SendEmpty(string type, ulong target, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new FastBufferWriter(0, Allocator.Temp);
+            using FastBufferWriter writer = new(0, Allocator.Temp);
             Send(type, target, writer, delivery);
-            writer.Dispose();
         }
 
         /// <summary>
@@ -109,10 +108,9 @@ namespace TcgEngine
         /// </summary>
         public void SendBytes(string type, ulong target, byte[] msg, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new FastBufferWriter(msg.Length, Allocator.Temp);
+            using FastBufferWriter writer = new(msg.Length, Allocator.Temp);
             writer.WriteBytesSafe(msg, msg.Length);
             Send(type, target, writer, delivery);
-            writer.Dispose();
         }
 
         /// <summary>
@@ -120,10 +118,9 @@ namespace TcgEngine
         /// </summary>
         public void SendString(string type, ulong target, string msg, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new FastBufferWriter(msg.Length, Allocator.Temp, TcgNetwork.MsgSizeMax);
+            using FastBufferWriter writer = new(msg.Length, Allocator.Temp, TcgNetwork.MsgSizeMax);
             writer.WriteValueSafe(msg);
             Send(type, target, writer, delivery);
-            writer.Dispose();
         }
 
         /// <summary>
@@ -131,10 +128,9 @@ namespace TcgEngine
         /// </summary>
         public void SendInt(string type, ulong target, int data, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new FastBufferWriter(4, Allocator.Temp);
+            using FastBufferWriter writer = new(4, Allocator.Temp);
             writer.WriteValueSafe(data);
             Send(type, target, writer, delivery);
-            writer.Dispose();
         }
 
         /// <summary>
@@ -142,10 +138,9 @@ namespace TcgEngine
         /// </summary>
         public void SendUInt64(string type, ulong target, ulong data, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new FastBufferWriter(8, Allocator.Temp);
+            using FastBufferWriter writer = new(8, Allocator.Temp);
             writer.WriteValueSafe(data);
             Send(type, target, writer, delivery);
-            writer.Dispose();
         }
 
         /// <summary>
@@ -153,10 +148,9 @@ namespace TcgEngine
         /// </summary>
         public void SendFloat(string type, ulong target, float data, NetworkDelivery delivery)
         {
-            FastBufferWriter writer = new(4, Allocator.Temp);
+            using FastBufferWriter writer = new(4, Allocator.Temp);
             writer.WriteValueSafe(data);
             Send(type, target, writer, delivery);
-            writer.Dispose();
         }
 
         /// <summary>
@@ -165,10 +159,9 @@ namespace TcgEngine
         /// </summary>
         public void SendObject<T>(string type, ulong target, T data, NetworkDelivery delivery) where T : INetworkSerializable
         {
-            FastBufferWriter writer = new(256, Allocator.Temp, TcgNetwork.MsgSizeMax);
+            using FastBufferWriter writer = new(256, Allocator.Temp, TcgNetwork.MsgSizeMax);
             writer.WriteNetworkSerializable(data);
             Send(type, target, writer, delivery);
-            writer.Dispose();
         }
 
         /// <summary>
@@ -241,9 +234,8 @@ namespace TcgEngine
         {
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(0, Allocator.Temp);
+                using FastBufferWriter writer = new(0, Allocator.Temp);
                 Send(type, targets, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -254,10 +246,9 @@ namespace TcgEngine
         {
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(msg.Length, Allocator.Temp);
+                using FastBufferWriter writer = new(msg.Length, Allocator.Temp);
                 writer.WriteBytesSafe(msg, msg.Length);
                 Send(type, targets, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -268,10 +259,9 @@ namespace TcgEngine
         {
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(msg.Length, Allocator.Temp, TcgNetwork.MsgSizeMax);
+                using FastBufferWriter writer = new(msg.Length, Allocator.Temp, TcgNetwork.MsgSizeMax);
                 writer.WriteValueSafe(msg);
                 Send(type, targets, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -282,10 +272,9 @@ namespace TcgEngine
         {
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(4, Allocator.Temp);
+                using FastBufferWriter writer = new(4, Allocator.Temp);
                 writer.WriteValueSafe(data);
                 Send(type, targets, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -296,10 +285,9 @@ namespace TcgEngine
         {
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(8, Allocator.Temp);
+                using FastBufferWriter writer = new(8, Allocator.Temp);
                 writer.WriteValueSafe(data);
                 Send(type, targets, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -310,10 +298,9 @@ namespace TcgEngine
         {
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(4, Allocator.Temp);
+                using FastBufferWriter writer = new(4, Allocator.Temp);
                 writer.WriteValueSafe(data);
                 Send(type, targets, writer, delivery);
-                writer.Dispose();
             }
         }
         
@@ -323,10 +310,9 @@ namespace TcgEngine
             // 仅服务器允许发送
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(256, Allocator.Temp, TcgNetwork.MsgSizeMax);
+                using FastBufferWriter writer = new(256, Allocator.Temp, TcgNetwork.MsgSizeMax);
                 writer.WriteNetworkSerializable(data);
                 Send(type, targets, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -338,9 +324,8 @@ namespace TcgEngine
             // 发送一个没有内容的空消息
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(0, Allocator.Temp);
+                using FastBufferWriter writer = new(0, Allocator.Temp);
                 SendAll(type, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -349,10 +334,9 @@ namespace TcgEngine
             // 广播字符串
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(msg.Length, Allocator.Temp, TcgNetwork.MsgSizeMax);
+                using FastBufferWriter writer = new(msg.Length, Allocator.Temp, TcgNetwork.MsgSizeMax);
                 writer.WriteValueSafe(msg);
                 SendAll(type, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -361,10 +345,9 @@ namespace TcgEngine
             // 广播 int
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(4, Allocator.Temp);
+                using FastBufferWriter writer = new(4, Allocator.Temp);
                 writer.WriteValueSafe(data);
                 SendAll(type, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -373,10 +356,9 @@ namespace TcgEngine
             // 广播 ulong
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(8, Allocator.Temp);
+                using FastBufferWriter writer = new(8, Allocator.Temp);
                 writer.WriteValueSafe(data);
                 SendAll(type, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -385,10 +367,9 @@ namespace TcgEngine
             // 广播 float
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(4, Allocator.Temp);
+                using FastBufferWriter writer = new(4, Allocator.Temp);
                 writer.WriteValueSafe(data);
                 SendAll(type, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -397,10 +378,9 @@ namespace TcgEngine
             // 广播字节数组
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(msg.Length, Allocator.Temp);
+                using FastBufferWriter writer = new(msg.Length, Allocator.Temp);
                 writer.WriteBytesSafe(msg, msg.Length);
                 SendAll(type, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -409,10 +389,9 @@ namespace TcgEngine
             // 广播自定义对象（结构体 / 数据对象）
             if (IsServer)
             {
-                FastBufferWriter writer = new FastBufferWriter(256, Allocator.Temp, TcgNetwork.MsgSizeMax);
+                using FastBufferWriter writer = new(256, Allocator.Temp, TcgNetwork.MsgSizeMax);
                 writer.WriteNetworkSerializable(data);
                 SendAll(type, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -464,9 +443,8 @@ namespace TcgEngine
             bool found = msg_dict.TryGetValue(type, out System.Action<ulong, FastBufferReader> callback);
             if (found)
             {
-                FastBufferReader reader = new FastBufferReader(writer, Allocator.Temp);
+                using FastBufferReader reader = new(writer, Allocator.Temp);
                 callback?.Invoke(ClientID, reader);
-                reader.Dispose();
             }
         }
 
@@ -488,11 +466,10 @@ namespace TcgEngine
                 reader.ReadBytesSafe(ref bytes, reader.Length - reader.Position);
 
                 // 使用新的 Writer 重新组包并发送
-                FastBufferWriter writer = new FastBufferWriter(bytes.Length, Allocator.Temp);
+                using FastBufferWriter writer = new(bytes.Length, Allocator.Temp);
                 writer.WriteBytesSafe(bytes, bytes.Length);
 
                 network.NetworkManager.CustomMessagingManager.SendNamedMessage(type, target, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -508,11 +485,10 @@ namespace TcgEngine
                 byte[] bytes = new byte[reader.Length - reader.Position];
                 reader.ReadBytesSafe(ref bytes, reader.Length - reader.Position);
 
-                FastBufferWriter writer = new FastBufferWriter(bytes.Length, Allocator.Temp);
+                using FastBufferWriter writer = new(bytes.Length, Allocator.Temp);
                 writer.WriteBytesSafe(bytes, bytes.Length);
 
                 network.NetworkManager.CustomMessagingManager.SendNamedMessage(type, targets, writer, delivery);
-                writer.Dispose();
             }
         }
 
@@ -528,7 +504,7 @@ namespace TcgEngine
                 byte[] bytes = new byte[reader.Length - reader.Position];
                 reader.ReadBytesSafe(ref bytes, reader.Length - reader.Position);
 
-                FastBufferWriter writer = new FastBufferWriter(bytes.Length, Allocator.Temp);
+                using FastBufferWriter writer = new(bytes.Length, Allocator.Temp);
                 writer.WriteBytesSafe(bytes, bytes.Length);
 
                 // 遍历所有客户端，除了来源客户端与服务器本身
@@ -537,8 +513,6 @@ namespace TcgEngine
                     if(client != source_client && client != ClientID)
                         network.NetworkManager.CustomMessagingManager.SendNamedMessage(type, client, writer, delivery);
                 }
-
-                writer.Dispose();
             }
         }
 
