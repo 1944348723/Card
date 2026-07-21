@@ -41,7 +41,8 @@ namespace TcgEngine.AI
 
         private GameLogic game_logic;   // 执行动作的逻辑（无动画，纯计算）
         private Game original_data;     // 进入 AI 计算时的游戏快照
-        private AIHeuristic heuristic;  // 启发式评分系统
+        private AIHeuristic heuristic;              // 局面评分系统
+        private AIActionEvaluator action_evaluator; // 候选动作排序与筛选
         private Thread ai_thread;       // AI 线程
 
         private NodeState first_node = null; // 根节点
@@ -71,6 +72,7 @@ namespace TcgEngine.AI
             job.ai_level = level;
 
             job.heuristic = new AIHeuristic(player_id, level);
+            job.action_evaluator = new AIActionEvaluator(player_id);
             job.game_logic = new GameLogic(null, true); // true = 禁用动画，纯逻辑
 
             return job;
@@ -119,7 +121,7 @@ namespace TcgEngine.AI
         {
             // 创建根节点（当前状态）
             first_node = CreateNode(null, null, ai_player_id, 0, 0);
-            first_node.hvalue = heuristic.CalculateHeuristic(original_data, first_node);
+            first_node.hvalue = heuristic.Calculate(original_data, first_node.tdepth);
             first_node.alpha = int.MinValue;
             first_node.beta = int.MaxValue;
 
@@ -228,7 +230,7 @@ namespace TcgEngine.AI
             for (int o = 0; o < action_list.Count; o++)
             {
                 AIAction action = action_list[o];
-                action.sort = heuristic.CalculateActionSort(data, action);
+                action.sort = action_evaluator.CalculateOrder(data, action);
                 action.valid = action.sort <= 0 || action.sort >= node.sort_min;
 
                 if (action.valid)
@@ -247,7 +249,7 @@ namespace TcgEngine.AI
                 AIAction action = action_list[o];
                 if (action.valid)
                 {
-                    action.score = heuristic.CalculateActionScore(data, action);
+                    action.score = action_evaluator.CalculatePriority(data, action);
                 }
             }
 
@@ -313,7 +315,7 @@ namespace TcgEngine.AI
             else
             {
                 // 否则为叶子节点，计算最终启发式得分
-                child_node.hvalue = heuristic.CalculateHeuristic(ndata, child_node);
+                child_node.hvalue = heuristic.Calculate(ndata, child_node.tdepth);
             }
 
             // ----------- 回溯：更新父节点评价 ----------
@@ -947,17 +949,6 @@ namespace TcgEngine.AI
 
                 score = 0;
                 sort = 0;
-            }
-
-            // 一个空动作对象
-            public static AIAction None
-            {
-                get
-                {
-                    AIAction a = new AIAction();
-                    a.type = 0;
-                    return a;
-                }
             }
         }
 
