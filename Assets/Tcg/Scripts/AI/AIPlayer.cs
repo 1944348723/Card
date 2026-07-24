@@ -66,6 +66,135 @@ namespace TcgEngine.AI
         }
 
         /// <summary>
+        /// 校验动作所属阶段，解析动作引用的实体，并提交给游戏逻辑。
+        /// AI 子类只负责选择动作，不负责维护具体动作的执行分派。
+        /// </summary>
+        protected bool TryExecuteAction(AIAction action)
+        {
+            if (!CanExecuteAction(action))
+                return false;
+
+            Game gameData = gameplay.GetGameData();
+            switch (action.type)
+            {
+                case GameAction.PlayCard:
+                {
+                    Card card = gameData.GetCard(action.card_uid);
+                    if (card == null)
+                        return false;
+                    gameplay.PlayCard(card, action.slot);
+                    return true;
+                }
+                case GameAction.Move:
+                {
+                    Card card = gameData.GetCard(action.card_uid);
+                    if (card == null)
+                        return false;
+                    gameplay.MoveCard(card, action.slot);
+                    return true;
+                }
+                case GameAction.Attack:
+                {
+                    Card attacker = gameData.GetCard(action.card_uid);
+                    Card target = gameData.GetCard(action.target_uid);
+                    if (attacker == null || target == null)
+                        return false;
+                    gameplay.AttackTarget(attacker, target);
+                    return true;
+                }
+                case GameAction.AttackPlayer:
+                {
+                    Card attacker = gameData.GetCard(action.card_uid);
+                    Player target = gameData.GetPlayer(action.target_player_id);
+                    if (attacker == null || target == null)
+                        return false;
+                    gameplay.AttackPlayer(attacker, target);
+                    return true;
+                }
+                case GameAction.CastAbility:
+                {
+                    Card card = gameData.GetCard(action.card_uid);
+                    AbilityData ability = AbilityData.Get(action.ability_id);
+                    if (card == null || ability == null)
+                        return false;
+                    gameplay.CastAbility(card, ability);
+                    return true;
+                }
+                case GameAction.SelectCard:
+                {
+                    Card target = gameData.GetCard(action.target_uid);
+                    if (target == null)
+                        return false;
+                    gameplay.SelectCard(target);
+                    return true;
+                }
+                case GameAction.SelectPlayer:
+                {
+                    Player target = gameData.GetPlayer(action.target_player_id);
+                    if (target == null)
+                        return false;
+                    gameplay.SelectPlayer(target);
+                    return true;
+                }
+                case GameAction.SelectSlot:
+                    if (action.slot == Slot.None)
+                        return false;
+                    gameplay.SelectSlot(action.slot);
+                    return true;
+                case GameAction.SelectChoice:
+                    if (action.value < 0)
+                        return false;
+                    gameplay.SelectChoice(action.value);
+                    return true;
+                case GameAction.SelectCost:
+                    if (action.value < 0)
+                        return false;
+                    gameplay.SelectCost(action.value);
+                    return true;
+                case GameAction.SelectMulligan:
+                {
+                    Player player = GetPlayer();
+                    if (player == null)
+                        return false;
+                    gameplay.Mulligan(player, Array.Empty<string>());
+                    return true;
+                }
+                case GameAction.CancelSelect:
+                    gameplay.CancelSelection();
+                    return true;
+                case GameAction.EndTurn:
+                    gameplay.EndTurn();
+                    return true;
+                case GameAction.Resign:
+                    gameplay.EndGame(PlayerId == 0 ? 1 : 0);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private bool CanExecuteAction(AIAction action)
+        {
+            if (action == null || action.type == GameAction.None)
+                return false;
+
+            switch (action.type)
+            {
+                case GameAction.SelectCard:
+                case GameAction.SelectPlayer:
+                case GameAction.SelectSlot:
+                case GameAction.SelectChoice:
+                case GameAction.SelectCost:
+                case GameAction.CancelSelect:
+                    return CanResolveSelection();
+                case GameAction.SelectMulligan:
+                    return CanMulligan();
+                default:
+                    return CanTakeAction();
+            }
+        }
+
+        /// <summary>
         /// 根据 AI 类型创建具体 AI 实例
         /// </summary>
         /// <param name="type">AI 类型（随机 / Minimax）</param>

@@ -799,8 +799,11 @@ namespace TcgEngine.AI
         }
 
         // 获取从某个节点开始的行动路径（调试用）
-        public string GetNodePath(NodeState node)
+        private string GetNodePath(NodeState node)
         {
+            if (node == null)
+                return "Prediction: unavailable";
+
             string path = "Prediction: HValue: " + node.hvalue + "\n";
             NodeState current = node;
             AIAction move;
@@ -842,49 +845,14 @@ namespace TcgEngine.AI
             System.GC.Collect();   // 强制 GC，彻底释放 AI 内存
         }
 
-
-        //---------------- 数据获取接口 ----------------
-
-        // 已计算的节点数量（性能统计）
-        public int GetNbNodesCalculated()
-        {
-            return nb_calculated;
-        }
-
-        // 搜索达到的最大深度
-        public int GetDepthReached()
-        {
-            return reached_depth;
-        }
-
-        // 获取最佳节点（最终选择）
-        public NodeState GetBest()
-        {
-            return best_move;
-        }
-
-        // 获取根节点
-        public NodeState GetFirst()
-        {
-            return first_node;
-        }
-
         // 获取最佳行动
         public AIAction GetBestAction()
         {
             return best_move != null ? best_move.last_action : null;
         }
 
-        // 是否已经找到最优解
-        public bool IsBestFound()
-        {
-            return best_move != null;
-        }
-
-    }
-
         //---------------------- 节点状态（用于 Minimax 搜索树） ----------------------
-        public class NodeState
+        private sealed class NodeState
         {
             public int tdepth;      // 当前节点所在“回合深度”（不是单纯步数，而是轮到谁 + 多少轮）
             public int taction;     // 当前回合已经执行了多少个动作（因为一回合可以多个操作）
@@ -905,16 +873,6 @@ namespace TcgEngine.AI
 
             public NodeState() { }
 
-            // 构造函数：创建一个新的节点状态
-            public NodeState(NodeState parent, int player_id, int turn_depth, int turn_action, int turn_sort)
-            {
-                this.parent = parent;
-                this.current_player = player_id;
-                this.tdepth = turn_depth;
-                this.taction = turn_action;
-                this.sort_min = turn_sort;
-            }
-
             // 清理节点（用于对象池复用）
             public void Clear()
             {
@@ -924,72 +882,5 @@ namespace TcgEngine.AI
                 childs.Clear();
             }
         }
-
-
-
-        //---------------------- AI 行为对象 ----------------------
-        public class AIAction
-        {
-            public ushort type;          // 行为类型（参见 GameAction 枚举）
-
-            // 行为涉及到的数据
-            public string card_uid;      // 操作者卡牌
-            public string target_uid;    // 目标卡牌（如果有）
-            public int target_player_id; // 目标玩家（攻击玩家 / 选择目标）
-            public string ability_id;    // 技能 ID
-            public Slot slot;            // 槽位（板位 / 站位）
-            public int value;            // 额外数值（用于选择类操作）
-
-            public int score;            // 行为评分：用于过滤不重要行为（只模拟分数高的）
-            public int sort;             // 行为执行顺序排序值（用于避免顺序不同导致重复搜索）
-            public bool valid;           // 行为是否有效（false 则直接忽略）
-
-            public AIAction() { }
-            public AIAction(ushort t) { type = t; }
-
-            // 调试文本（方便输出 AI 决策路径）
-            public string GetText(Game data)
-            {
-                string txt = GameAction.GetString(type);
-
-                Card card = data.GetCard(card_uid);
-                Card target = data.GetCard(target_uid);
-
-                if (card != null)
-                    txt += " card " + card.card_id;
-
-                if (target != null)
-                    txt += " target " + target.card_id;
-
-                if (slot != Slot.None)
-                    txt += " slot " + slot.x + "-" + slot.p;
-
-                if (ability_id != null)
-                    txt += " ability " + ability_id;
-
-                if (value > 0)
-                    txt += " value " + value;
-
-                return txt;
-            }
-
-            // 清除数据（对象池复用）
-            public void Clear()
-            {
-                type = 0;
-                valid = false;
-
-                card_uid = null;
-                target_uid = null;
-                ability_id = null;
-
-                target_player_id = -1;
-                slot = Slot.None;
-                value = -1;
-
-                score = 0;
-                sort = 0;
-            }
-        }
-
+    }
 }

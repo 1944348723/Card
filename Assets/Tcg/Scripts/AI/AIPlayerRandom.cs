@@ -106,8 +106,8 @@ namespace TcgEngine.AI
             }
 
             AIAction action = legalActions[rand.Next(0, legalActions.Count)];
-            ExecuteAction(gameData, action);
-            turnActionCount++;
+            if (TryExecuteAction(action))
+                turnActionCount++;
         }
 
         private void ResolveCurrentSelection()
@@ -244,30 +244,6 @@ namespace TcgEngine.AI
             };
         }
 
-        private void ExecuteAction(Game gameData, AIAction action)
-        {
-            Card card = gameData.GetCard(action.card_uid);
-
-            switch (action.type)
-            {
-                case GameAction.PlayCard:
-                    gameplay.PlayCard(card, action.slot);
-                    break;
-                case GameAction.Move:
-                    gameplay.MoveCard(card, action.slot);
-                    break;
-                case GameAction.Attack:
-                    gameplay.AttackTarget(card, gameData.GetCard(action.target_uid));
-                    break;
-                case GameAction.AttackPlayer:
-                    gameplay.AttackPlayer(card, gameData.GetPlayer(action.target_player_id));
-                    break;
-                case GameAction.CastAbility:
-                    gameplay.CastAbility(card, AbilityData.Get(action.ability_id));
-                    break;
-            }
-        }
-
         /// <summary>
         /// 随机选择卡牌作为目标
         /// </summary>
@@ -287,8 +263,8 @@ namespace TcgEngine.AI
                 if (targets.Count > 0)
                 {
                     Card card = targets[rand.Next(0, targets.Count)];
-                    gameplay.SelectCard(card);
-                    return true;
+                    AIAction action = new(GameAction.SelectCard) { target_uid = card.uid };
+                    return TryExecuteAction(action);
                 }
             }
 
@@ -343,20 +319,29 @@ namespace TcgEngine.AI
             int targetIndex = rand.Next(0, targetCount);
             if (targetIndex < playerTargets.Count)
             {
-                gameplay.SelectPlayer(playerTargets[targetIndex]);
-                return true;
+                AIAction action = new(GameAction.SelectPlayer)
+                {
+                    target_player_id = playerTargets[targetIndex].player_id,
+                };
+                return TryExecuteAction(action);
             }
 
             targetIndex -= playerTargets.Count;
             if (targetIndex < cardTargets.Count)
             {
-                gameplay.SelectCard(cardTargets[targetIndex]);
-                return true;
+                AIAction action = new(GameAction.SelectCard)
+                {
+                    target_uid = cardTargets[targetIndex].uid,
+                };
+                return TryExecuteAction(action);
             }
 
             targetIndex -= cardTargets.Count;
-            gameplay.SelectSlot(slotTargets[targetIndex]);
-            return true;
+            AIAction selectSlot = new(GameAction.SelectSlot)
+            {
+                slot = slotTargets[targetIndex],
+            };
+            return TryExecuteAction(selectSlot);
         }
 
         /// <summary>
@@ -385,8 +370,8 @@ namespace TcgEngine.AI
                 return false;
 
             int selectedChoice = choices[rand.Next(0, choices.Count)];
-            gameplay.SelectChoice(selectedChoice);
-            return true;
+            AIAction action = new(GameAction.SelectChoice) { value = selectedChoice };
+            return TryExecuteAction(action);
         }
 
         /// <summary>
@@ -408,8 +393,8 @@ namespace TcgEngine.AI
                     return false;
 
                 int choice = rand.Next(0, max + 1);
-                gameplay.SelectCost(choice);
-                return true;
+                AIAction action = new(GameAction.SelectCost) { value = choice };
+                return TryExecuteAction(action);
             }
 
             return false;
@@ -417,8 +402,7 @@ namespace TcgEngine.AI
 
         private void CancelSelect()
         {
-            if (CanResolveSelection())
-                gameplay.CancelSelection();
+            TryExecuteAction(new AIAction(GameAction.CancelSelect));
         }
 
         /// <summary>
@@ -426,19 +410,12 @@ namespace TcgEngine.AI
         /// </summary>
         private void SelectMulligan()
         {
-            if (!CanMulligan())
-                return;
-
-            Game gameData = gameplay.GetGameData();
-            Player player = gameData.GetPlayer(PlayerId);
-            string[] cards = System.Array.Empty<string>(); // 不换牌
-            gameplay.Mulligan(player, cards);
+            TryExecuteAction(new AIAction(GameAction.SelectMulligan));
         }
 
         private void EndTurn()
         {
-            if (CanTakeAction())
-                gameplay.EndTurn();
+            TryExecuteAction(new AIAction(GameAction.EndTurn));
         }
     }
 
