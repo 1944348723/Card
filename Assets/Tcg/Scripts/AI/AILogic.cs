@@ -21,6 +21,7 @@ namespace TcgEngine.AI
         private readonly GameLogic game_logic;   // 执行动作的逻辑（无动画，纯计算）
         private readonly AIHeuristic heuristic;  // 局面评分系统
         private readonly AIActionEvaluator action_evaluator; // 候选动作排序与筛选
+        private readonly AIActionGenerator action_generator; // 合法候选动作生成
 
         private Game original_data;     // 进入 AI 计算时的游戏快照
         private NodeState first_node = null; // 根节点
@@ -48,6 +49,7 @@ namespace TcgEngine.AI
             heuristic = new AIHeuristic(playerId, level);
             action_evaluator = new AIActionEvaluator(playerId);
             game_logic = new GameLogic(null, true);
+            action_generator = new AIActionGenerator(game_logic, CreateAction);
         }
 
         /// <summary>
@@ -173,27 +175,32 @@ namespace TcgEngine.AI
                     for (int c = 0; c < player.cards_hand.Count; c++)
                     {
                         Card card = player.cards_hand[c];
-                        AddActions(action_list, data, node, GameAction.PlayCard, card);
+                        action_generator.AddPlayCardActions(
+                            action_list,
+                            data,
+                            card,
+                            AIPlayPositionMode.SingleRandomBoardSlot,
+                            random_gen,
+                            slot_array.Get());
                     }
 
                     // 2️⃣ 尝试操作场上随从
                     for (int c = 0; c < player.cards_board.Count; c++)
                     {
                         Card card = player.cards_board[c];
-                        AddActions(action_list, data, node, GameAction.Attack, card);
-                        AddActions(action_list, data, node, GameAction.AttackPlayer, card);
-                        AddActions(action_list, data, node, GameAction.CastAbility, card);
-                        //AddActions(action_list, data, node, GameAction.Move, card); // 可选：移动
+                        action_generator.AddAttackActions(action_list, data, card);
+                        action_generator.AddActivatedAbilityActions(action_list, data, card);
+                        //action_generator.AddMoveActions(action_list, data, card); // 可选：移动
                     }
 
                     // 英雄技能
                     if (player.hero != null)
-                        AddActions(action_list, data, node, GameAction.CastAbility, player.hero);
+                        action_generator.AddActivatedAbilityActions(action_list, data, player.hero);
                 }
                 else
                 {
                     // 当前在“选择目标 / 选择费用 / 选择分支”等阶段
-                    AddSelectActions(action_list, data, node);
+                    action_generator.AddSelectionActions(action_list, data, 1, card_array);
                 }
             }
 
@@ -390,266 +397,6 @@ namespace TcgEngine.AI
             return nnode;
         }
 
-        // 为某张卡片添加所有可能的动作到 actions 列表中
-        private void AddActions(List<AIAction> actions, Game data, NodeState node, ushort type, Card card)
-        {
-            Player player = data.GetPlayer(data.current_player);
-
-            // 如果当前在选择目标状态，不允许普通行为
-            if (data.selector != SelectorType.None)
-                return;
-
-            // 麻痹状态不能行动
-            if (card.HasStatus(StatusType.Paralysed))
-                return;
-
-            // ----------------- 出牌逻辑 -----------------
-            if (type == GameAction.PlayCard)
-            {
-                // 随从类卡片
-                if (card.CardData.IsBoardCard())
-                {
-                    Slot slot = player.GetRandomEmptySlot(data.Board, random_gen, slot_array.Get());
-
-                    if (game_logic.Rules.CanPlayCard(card, slot))
-                    {
-                        AIAction action = CreateAction(type, card);
-                        action.slot = slot;
-                        actions.Add(action);
-                    }
-                }
-                // 装备类卡片
-                else if (card.CardData.IsEquipment())
-                {
-                    Player tplayer = data.GetPlayer(card.player_id);
-                    for (int c = 0; c < tplayer.cards_board.Count; c++)
-                    {
-                        Card tcard = tplayer.cards_board[c];
-                        if (game_logic.Rules.CanPlayCard(card, tcard.slot))
-                        {
-                            AIAction action = CreateAction(type, card);
-                            action.slot = tcard.slot;
-                            action.target_player_id = tplayer.player_id;
-                            actions.Add(action);
-                        }
-                    }
-                }
-                // 需要目标的法术
-                else if (card.CardData.IsRequireTargetSpell())
-                {
-                    // 目标是玩家
-                    for (int p = 0; p < data.players.Length; p++)
-                    {
-                        Player tplayer = data.players[p];
-                        Slot tslot = new Slot(tplayer.player_id);
-                        if (game_logic.Rules.CanPlayCard(card, tslot))
-                        {
-                            AIAction action = CreateAction(type, card);
-                            action.slot = tslot;
-                            action.target_player_id = tplayer.player_id;
-                            actions.Add(action);
-                        }
-                    }
-
-                    // 目标是随从
-                    foreach (Slot slot in data.Board.GetAll())
-                    {
-                        if (game_logic.Rules.CanPlayCard(card, slot))
-                        {
-                            Card slot_card = data.GetSlotCard(slot);
-                            AIAction action = CreateAction(type, card);
-                            action.slot = slot;
-                            action.target_uid = slot_card != null ? slot_card.uid : null;
-                            actions.Add(action);
-                        }
-                    }
-                }
-                // 无目标法术
-                else if (game_logic.Rules.CanPlayCard(card, Slot.None))
-                {
-                    AIAction action = CreateAction(type, card);
-                    actions.Add(action);
-                }
-            }
-
-            // ----------------- 攻击随从 -----------------
-            if (type == GameAction.Attack)
-            {
-                if (card.CanAttack())
-                {
-                    for (int p = 0; p < data.players.Length; p++)
-                    {
-                        if (p != player.player_id)
-                        {
-                            Player oplayer = data.players[p];
-                            for (int tc = 0; tc < oplayer.cards_board.Count; tc++)
-                            {
-                                Card target = oplayer.cards_board[tc];
-                                if (game_logic.Rules.CanAttackTarget(card, target))
-                                {
-                                    AIAction action = CreateAction(type, card);
-                                    action.target_uid = target.uid;
-                                    actions.Add(action);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ----------------- 攻击玩家 -----------------
-            if (type == GameAction.AttackPlayer)
-            {
-                if (card.CanAttack())
-                {
-                    for (int p = 0; p < data.players.Length; p++)
-                    {
-                        if (p != player.player_id)
-                        {
-                            Player oplayer = data.players[p];
-                            if (game_logic.Rules.CanAttackTarget(card, oplayer))
-                            {
-                                AIAction action = CreateAction(type, card);
-                                action.target_player_id = oplayer.player_id;
-                                actions.Add(action);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ----------------- 主动技能 -----------------
-            if (type == GameAction.CastAbility)
-            {
-                List<AbilityData> abilities = card.GetAbilities();
-                for (int a = 0; a < abilities.Count; a++)
-                {
-                    AbilityData ability = abilities[a];
-
-                    // 必须是可主动释放 + 有合法目标
-                    if (ability.trigger == AbilityTrigger.Activate &&
-                        game_logic.Rules.CanCastAbility(card, ability) &&
-                        ability.HasValidSelectTarget(data, card))
-                    {
-                        AIAction action = CreateAction(type, card);
-                        action.ability_id = ability.id;
-                        actions.Add(action);
-                    }
-                }
-            }
-
-            // ----------------- 移动卡片 -----------------
-            if (type == GameAction.Move)
-            {
-                foreach (Slot slot in data.Board.GetAll(player.player_id))
-                {
-                    if (game_logic.Rules.CanMoveCard(card, slot))
-                    {
-                        AIAction action = CreateAction(type, card);
-                        action.slot = slot;
-                        actions.Add(action);
-                    }
-                }
-            }
-        }
-
-        // 添加所有“选择阶段”的可能行为
-        private void AddSelectActions(List<AIAction> actions, Game data, NodeState node)
-        {
-            if (data.selector == SelectorType.None)
-                return;
-
-            Player player = data.GetPlayer(data.selector_player_id);
-            Card caster = data.GetCard(data.selector_caster_uid);
-            AbilityData ability = AbilityData.Get(data.selector_ability_id);
-            if (player == null || caster == null)
-                return;
-
-            // 选择目标（随从 / 玩家 / 空槽）
-            if (data.selector == SelectorType.SelectTarget && ability != null)
-            {
-                // 选择玩家
-                for (int p = 0; p < data.players.Length; p++)
-                {
-                    Player tplayer = data.players[p];
-                    if (ability.CanTarget(data, caster, tplayer))
-                    {
-                        AIAction action = CreateAction(GameAction.SelectPlayer, caster);
-                        action.target_player_id = tplayer.player_id;
-                        actions.Add(action);
-                    }
-                }
-
-                // 选择随从 or 空槽
-                foreach (Slot slot in data.Board.GetAll())
-                {
-                    Card tcard = data.GetSlotCard(slot);
-
-                    if (tcard != null && ability.CanTarget(data, caster, tcard))
-                    {
-                        AIAction action = CreateAction(GameAction.SelectCard, caster);
-                        action.target_uid = tcard.uid;
-                        actions.Add(action);
-                    }
-                    else if (tcard == null && ability.CanTarget(data, caster, slot))
-                    {
-                        AIAction action = CreateAction(GameAction.SelectSlot, caster);
-                        action.slot = slot;
-                        actions.Add(action);
-                    }
-                }
-            }
-
-            // 选择卡片
-            if (data.selector == SelectorType.SelectorCard && ability != null)
-            {
-                for (int p = 0; p < data.players.Length; p++)
-                {
-                    List<Card> cards = ability.GetCardTargets(data, caster, card_array);
-                    foreach (Card tcard in cards)
-                    {
-                        AIAction action = CreateAction(GameAction.SelectCard, caster);
-                        action.target_uid = tcard.uid;
-                        actions.Add(action);
-                    }
-                }
-            }
-
-            // 选择能力分支
-            if (data.selector == SelectorType.SelectorChoice && ability != null)
-            {
-                for (int i = 0; i < ability.chain_abilities.Length; i++)
-                {
-                    AbilityData choice = ability.chain_abilities[i];
-                    if (choice != null && game_logic.Rules.CanSelectAbility(caster, choice))
-                    {
-                        AIAction action = CreateAction(GameAction.SelectChoice, caster);
-                        action.value = i;
-                        actions.Add(action);
-                    }
-                }
-            }
-
-            // 选择法力值
-            if (data.selector == SelectorType.SelectorCost)
-            {
-                for (int i = 1; i <= player.mana; i++)
-                {
-                    AIAction action = CreateAction(GameAction.SelectCost, caster);
-                    action.value = i;
-                    actions.Add(action);
-                }
-            }
-
-            // 如果没有任何选择，加入取消选项
-            if (actions.Count == 0)
-            {
-                AIAction caction = CreateAction(GameAction.CancelSelect, caster);
-                actions.Add(caction);
-            }
-        }
-
-
         // 创建一个 AIAction（只指定类型）
         private AIAction CreateAction(ushort type)
         {
@@ -663,11 +410,8 @@ namespace TcgEngine.AI
         // 创建一个 AIAction（指定类型 + 关联的卡牌）
         private AIAction CreateAction(ushort type, Card card)
         {
-            AIAction action = action_pool.Create();
-            action.Clear();
-            action.type = type;
-            action.card_uid = card.uid;               // 绑定这张卡牌
-            action.valid = true;
+            AIAction action = CreateAction(type);
+            action.card_uid = card?.uid;
             return action;
         }
 
