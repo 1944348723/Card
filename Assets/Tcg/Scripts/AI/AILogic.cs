@@ -16,34 +16,13 @@ namespace TcgEngine.AI
     /// </summary>
     public class AILogic
     {
-        //-------- AI 配置参数 ------------------
+        private readonly int ai_player_id;
+        private readonly AISearchSettings search_settings;
+        private readonly GameLogic game_logic;   // 执行动作的逻辑（无动画，纯计算）
+        private readonly AIHeuristic heuristic;  // 局面评分系统
+        private readonly AIActionEvaluator action_evaluator; // 候选动作排序与筛选
 
-        public int ai_depth = 3;                // 预测多少回合（越大越智能，但计算量指数增长）
-        public int ai_depth_wide = 1;           // 前多少层采用“宽搜索”（更多分支）
-        public int actions_per_turn = 2;        // 每个回合最多连续预测多少动作
-        public int actions_per_turn_wide = 3;   // 宽搜索下的动作限制
-        public int nodes_per_action = 4;        // 每个动作最多保留多少子节点（超过将剪枝）
-        public int nodes_per_action_wide = 7;   // 宽搜索版本
-
-        /*
-         * 举例：
-         * 第一层（AI 当前回合）→ 最多考虑 3 步连续动作 → 每一步最多 7 个候选分支
-         * 第二层（对手回合）→ 最多 2 步动作 → 每步最多 4 个分支
-         * 第三层（AI 下回合）→ 同上
-         * 
-         * 在达到最大深度或游戏结束时计算 heuristic，
-         * heuristic 会从叶子往上回溯，得出当前应执行的最优路径。
-         */
-
-        //-----
-
-        public int ai_player_id;   // AI 对应的玩家 id（通常是 1）
-        public int ai_level;       // AI 难度等级
-
-        private GameLogic game_logic;   // 执行动作的逻辑（无动画，纯计算）
         private Game original_data;     // 进入 AI 计算时的游戏快照
-        private AIHeuristic heuristic;              // 局面评分系统
-        private AIActionEvaluator action_evaluator; // 候选动作排序与筛选
         private NodeState first_node = null; // 根节点
         private NodeState best_move = null;  // 最终最佳决策节点
 
@@ -55,27 +34,28 @@ namespace TcgEngine.AI
         private System.Random random_gen;
 
         // 内存池优化（避免 GC 峰值）
-        private Pool<NodeState> node_pool = new Pool<NodeState>();
-        private Pool<Game> data_pool = new Pool<Game>();
-        private Pool<AIAction> action_pool = new Pool<AIAction>();
-        private Pool<List<AIAction>> list_pool = new Pool<List<AIAction>>();
-        private ListSwap<Card> card_array = new ListSwap<Card>();
-        private ListSwap<Slot> slot_array = new ListSwap<Slot>();
+        private readonly Pool<NodeState> node_pool = new();
+        private readonly Pool<Game> data_pool = new();
+        private readonly Pool<AIAction> action_pool = new();
+        private readonly Pool<List<AIAction>> list_pool = new();
+        private readonly ListSwap<Card> card_array = new();
+        private readonly ListSwap<Slot> slot_array = new();
+
+        private AILogic(int playerId, int level, AISearchSettings searchSettings)
+        {
+            ai_player_id = playerId;
+            search_settings = searchSettings;
+            heuristic = new AIHeuristic(playerId, level);
+            action_evaluator = new AIActionEvaluator(playerId);
+            game_logic = new GameLogic(null, true);
+        }
 
         /// <summary>
-        /// 工厂方法：创建 AI
+        /// 创建完整初始化的 AI 搜索器。
         /// </summary>
-        public static AILogic Create(int player_id, int level)
+        public static AILogic Create(int playerId, int level, AISearchSettings searchSettings = null)
         {
-            AILogic job = new AILogic();
-            job.ai_player_id = player_id;
-            job.ai_level = level;
-
-            job.heuristic = new AIHeuristic(player_id, level);
-            job.action_evaluator = new AIActionEvaluator(player_id);
-            job.game_logic = new GameLogic(null, true); // true = 禁用动画，纯逻辑
-
-            return job;
+            return new AILogic(playerId, level, searchSettings ?? AISearchSettings.Default);
         }
 
         /// <summary>
@@ -179,7 +159,9 @@ namespace TcgEngine.AI
             List<AIAction> action_list = list_pool.Create();
 
             // 决定允许多少连续动作
-            int max_actions = node.tdepth < ai_depth_wide ? actions_per_turn_wide : actions_per_turn;
+            int max_actions = node.tdepth < search_settings.WideSearchDepth
+                ? search_settings.WideMaxActionsPerTurn
+                : search_settings.MaxActionsPerTurn;
 
             // 还没达到该回合最大操作数
             if (node.taction < max_actions)
@@ -265,7 +247,9 @@ namespace TcgEngine.AI
                     count_valid++;
             }
 
-            int max_actions = node.tdepth < ai_depth_wide ? nodes_per_action_wide : nodes_per_action;
+            int max_actions = node.tdepth < search_settings.WideSearchDepth
+                ? search_settings.WideMaxBranchesPerAction
+                : search_settings.MaxBranchesPerAction;
             int max_actions_skip = max_actions + 2;
 
             if (count_valid <= max_actions_skip)
@@ -342,7 +326,7 @@ namespace TcgEngine.AI
 
             // ----------- 递归继续搜索 ----------
             // 若：游戏尚未结束 且 没达到最大搜索层级，继续
-            if (!ndata.HasEnded() && child_node.tdepth < ai_depth)
+            if (!ndata.HasEnded() && child_node.tdepth < search_settings.MaxTurnDepth)
             {
                 CalculateNode(ndata, child_node);
             }
@@ -824,25 +808,35 @@ namespace TcgEngine.AI
 
         //---------------- 内存清理 ----------------
 
-        // 清空 AI 内存，释放所有池对象
+        // 释放本次搜索持有的状态，并保留池容量供下一次搜索复用
         public void ClearMemory()
         {
-            original_data = null;
-            first_node = null;
-            best_move = null;
+            if (running)
+                throw new InvalidOperationException("AI 搜索仍在运行，不能清理搜索状态");
 
-            // 清空所有节点和动作
+            // 先断开树和列表中的对象引用，再归还池对象。
             foreach (NodeState node in node_pool.GetAllActive())
                 node.Clear();
-            foreach (AIAction order in action_pool.GetAllActive())
-                order.Clear();
+            foreach (AIAction action in action_pool.GetAllActive())
+                action.Clear();
+            foreach (List<AIAction> actions in list_pool.GetAllActive())
+                actions.Clear();
 
             data_pool.DisposeAll();
             node_pool.DisposeAll();
             action_pool.DisposeAll();
             list_pool.DisposeAll();
 
-            System.GC.Collect();   // 强制 GC，彻底释放 AI 内存
+            card_array.Clear();
+            slot_array.Clear();
+
+            game_logic.ClearResolve();
+            game_logic.SetData(null);
+
+            original_data = null;
+            first_node = null;
+            best_move = null;
+            random_gen = null;
         }
 
         // 获取最佳行动
