@@ -186,6 +186,7 @@ namespace TcgEngine.Gameplay
             player.ready = true;
             runtime.Cards.DrawCards(player, count);
             runtime.Events.RaiseRefreshed();
+            // TODO: 经常有这样的在某个操作后面接着另一个操作，流程隐藏在了调用链中
             if (runtime.Game.AreAllPlayersReady())
                 runtime.Flow.StartTurn();
         }

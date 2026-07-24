@@ -1,7 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using TcgEngine.Client;
 using TcgEngine.Gameplay;
 
 namespace TcgEngine.AI
@@ -12,18 +11,24 @@ namespace TcgEngine.AI
     /// </summary>
     public class AIPlayerRandom : AIPlayer
     {
-        private bool is_playing = false;    // AI 是否正在行动
-        private bool is_selecting = false;  // AI 是否正在选择目标/卡牌
+        private const float FirstDecisionDelay = 1f;
+        private const float DecisionDelay = 0.5f;
+        private const int MaxActionsPerTurn = 8;
+        private const double EndTurnChance = 0.15;
 
-        private System.Random rand = new System.Random(); // 随机数生成器
+        private readonly System.Random rand = new();
+        private readonly List<AIAction> legalActions = new();
+
+        private bool isRunning = false;
+        private int activeTurn = -1;
+        private int turnActionCount = 0;
 
         /// <summary>
         /// 构造函数
         /// </summary>
         public AIPlayerRandom(GameLogic gameplay, int id, int level)
+            : base(gameplay, id, level)
         {
-            this.gameplay = gameplay;
-            player_id = id;
         }
 
         /// <summary>
@@ -31,320 +36,408 @@ namespace TcgEngine.AI
         /// </summary>
         public override void Update()
         {
-            if (!CanPlay()) // 如果 AI 不能行动，则返回
+            if (isRunning || gameplay.IsResolving())
                 return;
 
-            Game game_data = gameplay.GetGameData();
-            Player player = game_data.GetPlayer(player_id);
+            if (!CanMulligan() && !CanResolveSelection() && !CanTakeAction())
+                return;
 
-            // 如果轮到 AI 行动，并且当前没有正在解析的动作
-            if (gameplay.Rules.IsPlayerTurn(player) && !gameplay.IsResolving())
+            isRunning = true;
+            TimeTool.StartCoroutine(RunDecision());
+        }
+
+        /// <summary>
+        /// 每次只处理一个当前决策，完成后由下一帧根据最新游戏状态继续。
+        /// </summary>
+        private IEnumerator RunDecision()
+        {
+            try
             {
-                // 如果 AI 不是在行动，并且没有选择器，轮到 AI
-                if(!is_playing && game_data.selector == SelectorType.None && game_data.current_player == player_id)
+                yield return new WaitForSeconds(GetDecisionDelay());
+
+                if (gameplay.IsResolving())
+                    yield break;
+
+                if (CanMulligan())
                 {
-                    is_playing = true;
-                    TimeTool.StartCoroutine(AiTurn()); // 启动 AI 回合协程
+                    SelectMulligan();
+                    yield break;
                 }
 
-                // 如果需要选择目标/卡牌
-                if (!is_selecting && game_data.selector != SelectorType.None && game_data.selector_player_id == player_id)
+                if (CanResolveSelection())
                 {
-                    if (game_data.selector == SelectorType.SelectTarget)
-                    {
-                        is_selecting = true;
-                        TimeTool.StartCoroutine(AiSelectTarget());
-                    }
+                    ResolveCurrentSelection();
+                    yield break;
+                }
 
-                    if (game_data.selector == SelectorType.SelectorCard)
-                    {
-                        is_selecting = true;
-                        TimeTool.StartCoroutine(AiSelectCard());
-                    }
+                if (CanTakeAction())
+                    ExecuteNextTurnAction();
+            }
+            finally
+            {
+                isRunning = false;
+            }
+        }
 
-                    if (game_data.selector == SelectorType.SelectorChoice)
-                    {
-                        is_selecting = true;
-                        TimeTool.StartCoroutine(AiSelectChoice());
-                    }
+        private float GetDecisionDelay()
+        {
+            Game gameData = gameplay.GetGameData();
+            bool isFirstTurnAction = CanTakeAction() && gameData.turn_count != activeTurn;
+            return isFirstTurnAction ? FirstDecisionDelay : DecisionDelay;
+        }
 
-                    if (game_data.selector == SelectorType.SelectorCost)
+        private void ExecuteNextTurnAction()
+        {
+            Game gameData = gameplay.GetGameData();
+            if (activeTurn != gameData.turn_count)
+            {
+                activeTurn = gameData.turn_count;
+                turnActionCount = 0;
+            }
+
+            CollectLegalActions(gameData, legalActions);
+
+            bool reachedActionLimit = turnActionCount >= MaxActionsPerTurn;
+            bool randomlyEndTurn = turnActionCount > 0 && rand.NextDouble() < EndTurnChance;
+            if (legalActions.Count == 0 || reachedActionLimit || randomlyEndTurn)
+            {
+                EndTurn();
+                return;
+            }
+
+            AIAction action = legalActions[rand.Next(0, legalActions.Count)];
+            ExecuteAction(gameData, action);
+            turnActionCount++;
+        }
+
+        private void ResolveCurrentSelection()
+        {
+            Game gameData = gameplay.GetGameData();
+            var selected = gameData.selector switch
+            {
+                SelectorType.SelectTarget => TrySelectTarget(),
+                SelectorType.SelectorCard => TrySelectCard(),
+                SelectorType.SelectorChoice => TrySelectChoice(),
+                SelectorType.SelectorCost => TrySelectCost(),
+                _ => false,
+            };
+            if (!selected && CanResolveSelection())
+                CancelSelect();
+        }
+
+        // ---------- 普通回合动作 ----------
+
+        private void CollectLegalActions(Game gameData, List<AIAction> actions)
+        {
+            actions.Clear();
+
+            Player player = gameData.GetPlayer(PlayerId);
+            if (player == null || !gameplay.Rules.IsPlayerActionTurn(player))
+                return;
+
+            foreach (Card card in player.cards_hand)
+                AddPlayCardActions(gameData, player, card, actions);
+
+            foreach (Card card in player.cards_board)
+            {
+                AddAttackActions(gameData, card, actions);
+                AddMoveActions(gameData, player, card, actions);
+                AddAbilityActions(gameData, card, actions);
+            }
+
+            foreach (Card card in player.cards_equip)
+                AddAbilityActions(gameData, card, actions);
+
+            if (player.hero != null)
+                AddAbilityActions(gameData, player.hero, actions);
+        }
+
+        private void AddPlayCardActions(Game gameData, Player player, Card card, List<AIAction> actions)
+        {
+            if (card.CardData.IsBoardCard() || card.CardData.IsEquipment())
+            {
+                foreach (Slot slot in gameData.Board.GetAll(player.player_id))
+                {
+                    if (gameplay.Rules.CanPlayCard(card, slot))
+                        actions.Add(CreateAction(GameAction.PlayCard, card, slot));
+                }
+                return;
+            }
+
+            if (card.CardData.IsRequireTargetSpell())
+            {
+                foreach (Player target in gameData.players)
+                {
+                    Slot playerSlot = new(target.player_id);
+                    if (gameplay.Rules.CanPlayCard(card, playerSlot))
+                        actions.Add(CreateAction(GameAction.PlayCard, card, playerSlot));
+                }
+
+                foreach (Slot slot in gameData.Board.GetAll())
+                {
+                    if (gameplay.Rules.CanPlayCard(card, slot))
+                        actions.Add(CreateAction(GameAction.PlayCard, card, slot));
+                }
+                return;
+            }
+
+            if (gameplay.Rules.CanPlayCard(card, Slot.None))
+                actions.Add(CreateAction(GameAction.PlayCard, card, Slot.None));
+        }
+
+        private void AddAttackActions(Game gameData, Card attacker, List<AIAction> actions)
+        {
+            foreach (Player targetPlayer in gameData.players)
+            {
+                if (gameplay.Rules.CanAttackTarget(attacker, targetPlayer))
+                {
+                    AIAction attackPlayer = CreateAction(GameAction.AttackPlayer, attacker, Slot.None);
+                    attackPlayer.target_player_id = targetPlayer.player_id;
+                    actions.Add(attackPlayer);
+                }
+
+                foreach (Card targetCard in targetPlayer.cards_board)
+                {
+                    if (gameplay.Rules.CanAttackTarget(attacker, targetCard))
                     {
-                        is_selecting = true;
-                        TimeTool.StartCoroutine(AiSelectCost());
+                        AIAction attackCard = CreateAction(GameAction.Attack, attacker, Slot.None);
+                        attackCard.target_uid = targetCard.uid;
+                        actions.Add(attackCard);
                     }
                 }
             }
+        }
 
-            // 如果是 Mulligan 阶段，AI 自动选择
-            if (!is_selecting && gameplay.Rules.IsPlayerMulliganTurn(player))
+        private void AddMoveActions(Game gameData, Player player, Card card, List<AIAction> actions)
+        {
+            foreach (Slot slot in gameData.Board.GetAll(player.player_id))
             {
-                is_selecting = true;
-                TimeTool.StartCoroutine(AiSelectMulligan());
+                if (gameplay.Rules.CanMoveCard(card, slot))
+                    actions.Add(CreateAction(GameAction.Move, card, slot));
             }
         }
 
-        // ---------- AI 回合协程 ----------
-
-        /// <summary>
-        /// AI 回合协程，随机出牌、攻击、结束回合
-        /// </summary>
-        private IEnumerator AiTurn()
+        private void AddAbilityActions(Game gameData, Card card, List<AIAction> actions)
         {
-            yield return new WaitForSeconds(1f);
-
-            PlayCard(); // 随机出牌
-            yield return new WaitForSeconds(0.5f);
-            PlayCard();
-            yield return new WaitForSeconds(0.5f);
-            PlayCard();
-
-            Attack(); // 随机攻击
-            yield return new WaitForSeconds(0.5f);
-            Attack();
-            yield return new WaitForSeconds(0.5f);
-
-            AttackPlayer(); // 随机攻击对方玩家
-            yield return new WaitForSeconds(0.5f);
-
-            EndTurn(); // 结束回合
-
-            is_playing = false;
-        }
-
-        // ---------- 选择协程 ----------
-
-        private IEnumerator AiSelectCard()
-        {
-            yield return new WaitForSeconds(0.5f);
-            SelectCard();    // 随机选择卡牌
-            yield return new WaitForSeconds(0.5f);
-            CancelSelect();  // 取消选择（保证流程继续）
-            is_selecting = false;
-        }
-
-        private IEnumerator AiSelectTarget()
-        {
-            yield return new WaitForSeconds(0.5f);
-            SelectTarget();  
-            yield return new WaitForSeconds(0.5f);
-            CancelSelect();
-            is_selecting = false;
-        }
-
-        private IEnumerator AiSelectChoice()
-        {
-            yield return new WaitForSeconds(0.5f);
-            SelectChoice();  
-            yield return new WaitForSeconds(0.5f);
-            CancelSelect();
-            is_selecting = false;
-        }
-
-        private IEnumerator AiSelectCost()
-        {
-            yield return new WaitForSeconds(0.5f);
-            SelectCost();    
-            yield return new WaitForSeconds(0.5f);
-            CancelSelect();
-            is_selecting = false;
-        }
-
-        private IEnumerator AiSelectMulligan()
-        {
-            yield return new WaitForSeconds(0.5f);
-            SelectMulligan();  
-            yield return new WaitForSeconds(0.5f);
-            is_selecting = false;
-        }
-
-        // ---------- 随机动作方法 ----------
-
-        /// <summary>
-        /// 随机出手卡牌
-        /// </summary>
-        public void PlayCard()
-        {
-            if (!CanPlay())
-                return;
-
-            Game game_data = gameplay.GetGameData();
-            Player player = game_data.GetPlayer(player_id);
-
-            if (player.cards_hand.Count > 0 && gameplay.Rules.IsPlayerActionTurn(player))
+            foreach (AbilityData ability in card.GetAbilities())
             {
-                Card random = player.GetRandomCard(player.cards_hand, rand);
-                Slot slot = player.GetRandomEmptySlot(game_data.Board, rand);
-
-                // 法术卡可以攻击任何槽位
-                if (random != null && random.CardData.IsRequireTargetSpell())
-                    slot = game_data.GetRandomSlot(rand);
-
-                // 装备卡放置在已占用的槽位
-                if(random != null && random.CardData.IsEquipment())
-                    slot = player.GetRandomOccupiedSlot(game_data.Board, rand);
-
-                if (random != null)
-                    gameplay.PlayCard(random, slot);
+                if (ability != null
+                    && gameplay.Rules.CanCastAbility(card, ability)
+                    && ability.HasValidSelectTarget(gameData, card))
+                {
+                    AIAction action = CreateAction(GameAction.CastAbility, card, Slot.None);
+                    action.ability_id = ability.id;
+                    actions.Add(action);
+                }
             }
         }
 
-        /// <summary>
-        /// 随机攻击其他卡牌
-        /// </summary>
-        public void Attack()
+        private static AIAction CreateAction(ushort type, Card card, Slot slot)
         {
-            if (!CanPlay())
-                return;
-
-            Game game_data = gameplay.GetGameData();
-            Player player = game_data.GetPlayer(player_id);
-
-            if (player.cards_board.Count > 0 && gameplay.Rules.IsPlayerActionTurn(player))
+            return new AIAction(type)
             {
-                Card random = player.GetRandomCard(player.cards_board, rand);
-                Card rtarget = game_data.GetRandomBoardCard(rand);
-                if (random != null && rtarget != null)
-                    gameplay.AttackTarget(random, rtarget);
-            }
+                card_uid = card.uid,
+                target_player_id = -1,
+                slot = slot,
+                value = -1,
+                valid = true,
+            };
         }
 
-        /// <summary>
-        /// 随机攻击对手玩家
-        /// </summary>
-        public void AttackPlayer()
+        private void ExecuteAction(Game gameData, AIAction action)
         {
-            if (!CanPlay())
-                return;
+            Card card = gameData.GetCard(action.card_uid);
 
-            Game game_data = gameplay.GetGameData();
-            Player player = game_data.GetPlayer(player_id);
-            Player oplayer = game_data.GetRandomPlayer(rand);
-
-            if (player.cards_board.Count > 0 && gameplay.Rules.IsPlayerActionTurn(player))
+            switch (action.type)
             {
-                Card random = player.GetRandomCard(player.cards_board, rand);
-                if (random != null && oplayer != null && oplayer != player)
-                    gameplay.AttackPlayer(random, oplayer);
+                case GameAction.PlayCard:
+                    gameplay.PlayCard(card, action.slot);
+                    break;
+                case GameAction.Move:
+                    gameplay.MoveCard(card, action.slot);
+                    break;
+                case GameAction.Attack:
+                    gameplay.AttackTarget(card, gameData.GetCard(action.target_uid));
+                    break;
+                case GameAction.AttackPlayer:
+                    gameplay.AttackPlayer(card, gameData.GetPlayer(action.target_player_id));
+                    break;
+                case GameAction.CastAbility:
+                    gameplay.CastAbility(card, AbilityData.Get(action.ability_id));
+                    break;
             }
         }
 
         /// <summary>
         /// 随机选择卡牌作为目标
         /// </summary>
-        public void SelectCard()
+        private bool TrySelectCard()
         {
-            if (!CanPlay())
-                return;
+            if (!CanResolveSelection())
+                return false;
 
-            Game game_data = gameplay.GetGameData();
-            Player player = game_data.GetPlayer(player_id);
-            AbilityData ability = AbilityData.Get(game_data.selector_ability_id);
-            Card caster = game_data.GetCard(game_data.selector_caster_uid);
+            Game gameData = gameplay.GetGameData();
+            Player player = gameData.GetPlayer(PlayerId);
+            AbilityData ability = AbilityData.Get(gameData.selector_ability_id);
+            Card caster = gameData.GetCard(gameData.selector_caster_uid);
 
             if (player != null && ability != null && caster != null)
             {
-                List<Card> card_list = ability.GetCardTargets(game_data, caster);
-                if (card_list.Count > 0)
+                List<Card> targets = ability.GetCardTargets(gameData, caster);
+                if (targets.Count > 0)
                 {
-                    Card card = card_list[rand.Next(0, card_list.Count)];
+                    Card card = targets[rand.Next(0, targets.Count)];
                     gameplay.SelectCard(card);
+                    return true;
                 }
             }
+
+            return false;
         }
 
         /// <summary>
         /// 随机选择目标卡牌（玩家操作时）
         /// </summary>
-        public void SelectTarget()
+        private bool TrySelectTarget()
         {
-            if (!CanPlay())
-                return;
+            if (!CanResolveSelection())
+                return false;
 
-            Game game_data = gameplay.GetGameData();
-            if (game_data.selector != SelectorType.None)
+            // 取到卡牌和能力
+            Game gameData = gameplay.GetGameData();
+            AbilityData ability = AbilityData.Get(gameData.selector_ability_id);
+            Card caster = gameData.GetCard(gameData.selector_caster_uid);
+            if (ability == null || caster == null)
+                return false;
+
+            // 找出可能的目标
+            List<Player> playerTargets = new();
+            List<Card> cardTargets = new();
+            List<Slot> slotTargets = new();
+
+            foreach (Player player in gameData.players)
             {
-                int target_player = (player_id == 0 ? 1 : 0); // 选对手
-                Player tplayer = game_data.GetPlayer(target_player);
+                if (ability.CanTarget(gameData, caster, player))
+                    playerTargets.Add(player);
+            }
 
-                if (tplayer.cards_board.Count > 0)
+            foreach (Slot slot in gameData.Board.GetAll())
+            {
+                Card card = gameData.GetSlotCard(slot);
+                if (card != null)
                 {
-                    Card random = tplayer.GetRandomCard(tplayer.cards_board, rand);
-                    if (random != null)
-                        gameplay.SelectCard(random);
+                    if (ability.CanTarget(gameData, caster, card))
+                        cardTargets.Add(card);
+                }
+                else if (ability.CanTarget(gameData, caster, slot))
+                {
+                    slotTargets.Add(slot);
                 }
             }
+
+            int targetCount = playerTargets.Count + cardTargets.Count + slotTargets.Count;
+            if (targetCount == 0)
+                return false;
+
+            // 随机选择一个目标
+            int targetIndex = rand.Next(0, targetCount);
+            if (targetIndex < playerTargets.Count)
+            {
+                gameplay.SelectPlayer(playerTargets[targetIndex]);
+                return true;
+            }
+
+            targetIndex -= playerTargets.Count;
+            if (targetIndex < cardTargets.Count)
+            {
+                gameplay.SelectCard(cardTargets[targetIndex]);
+                return true;
+            }
+
+            targetIndex -= cardTargets.Count;
+            gameplay.SelectSlot(slotTargets[targetIndex]);
+            return true;
         }
 
         /// <summary>
         /// 随机选择能力链选项
         /// </summary>
-        public void SelectChoice()
+        private bool TrySelectChoice()
         {
-            if (!CanPlay())
-                return;
+            if (!CanResolveSelection())
+                return false;
 
-            Game game_data = gameplay.GetGameData();
-            AbilityData ability = AbilityData.Get(game_data.selector_ability_id);
-            if (ability != null && ability.chain_abilities.Length > 0)
+            Game gameData = gameplay.GetGameData();
+            AbilityData ability = AbilityData.Get(gameData.selector_ability_id);
+            Card caster = gameData.GetCard(gameData.selector_caster_uid);
+            if (ability == null || caster == null)
+                return false;
+
+            List<int> choices = new();
+            for (int i = 0; i < ability.chain_abilities.Length; i++)
             {
-                int choice = rand.Next(0, ability.chain_abilities.Length);
-                gameplay.SelectChoice(choice);
+                AbilityData choice = ability.chain_abilities[i];
+                if (choice != null && gameplay.Rules.CanSelectAbility(caster, choice))
+                    choices.Add(i);
             }
+
+            if (choices.Count == 0)
+                return false;
+
+            int selectedChoice = choices[rand.Next(0, choices.Count)];
+            gameplay.SelectChoice(selectedChoice);
+            return true;
         }
 
         /// <summary>
         /// 随机选择支付的法力值
         /// </summary>
-        public void SelectCost()
+        private bool TrySelectCost()
         {
-            if (!CanPlay())
-                return;
+            if (!CanResolveSelection())
+                return false;
 
-            Game game_data = gameplay.GetGameData();
-            Player player = game_data.GetPlayer(player_id);
-            Card card = game_data.GetCard(game_data.selector_caster_uid);
+            Game gameData = gameplay.GetGameData();
+            Player player = gameData.GetPlayer(PlayerId);
+            Card card = gameData.GetCard(gameData.selector_caster_uid);
 
             if (player != null && card != null)
             {
-                int max = Mathf.Clamp(player.mana, 0, 9);
+                int max = Mathf.Min(player.mana, GameplayData.Get().mana_max - 1);
+                if (max < 0)
+                    return false;
+
                 int choice = rand.Next(0, max + 1);
                 gameplay.SelectCost(choice);
+                return true;
             }
+
+            return false;
         }
 
-        /// <summary>
-        /// 取消选择
-        /// </summary>
-        public void CancelSelect()
+        private void CancelSelect()
         {
-            if (CanPlay())
+            if (CanResolveSelection())
                 gameplay.CancelSelection();
         }
 
         /// <summary>
         /// Mulligan 阶段随机选择（不换牌）
         /// </summary>
-        public void SelectMulligan()
+        private void SelectMulligan()
         {
-            if (!CanPlay())
+            if (!CanMulligan())
                 return;
 
-            Game game_data = gameplay.GetGameData();
-            if (game_data.phase == GamePhase.Mulligan)
-            {
-                Player player = game_data.GetPlayer(player_id);
-                string[] cards = new string[0]; // 不换牌
-                gameplay.Mulligan(player, cards);
-            }
+            Game gameData = gameplay.GetGameData();
+            Player player = gameData.GetPlayer(PlayerId);
+            string[] cards = System.Array.Empty<string>(); // 不换牌
+            gameplay.Mulligan(player, cards);
         }
 
-        /// <summary>
-        /// 结束回合
-        /// </summary>
-        public void EndTurn()
+        private void EndTurn()
         {
-            if (CanPlay())
+            if (CanTakeAction())
                 gameplay.EndTurn();
         }
     }

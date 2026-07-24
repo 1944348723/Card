@@ -10,8 +10,8 @@ namespace TcgEngine.AI
     /// </summary>
     public class AIPlayerMM : AIPlayer
     {
-        private AILogic ai_logic;        // AI 核心逻辑（Minimax + alpha-beta 剪枝）
-        private bool is_playing = false; // AI 当前是否正在执行动作
+        private AILogic aiLogic;        // AI 核心逻辑（Minimax + alpha-beta 剪枝）
+        private bool isPlaying = false; // AI 当前是否正在执行动作
 
         /// <summary>
         /// 构造函数
@@ -19,12 +19,10 @@ namespace TcgEngine.AI
         /// <param name="gameplay">游戏逻辑对象</param>
         /// <param name="id">AI 控制的玩家 ID</param>
         /// <param name="level">AI 等级（1~10）</param>
-        public AIPlayerMM(GameLogic gameplay, int id, int level)
+        public AIPlayerMM(GameLogic gameplay, int playerId, int level)
+            : base(gameplay, playerId, Mathf.Clamp(level, 1, 10))
         {
-            this.gameplay = gameplay;
-            player_id = id;
-            ai_level = Mathf.Clamp(level, 1, 10); // 限制 AI 等级在 1~10
-            ai_logic = AILogic.Create(id, ai_level); // 创建 Minimax AI 核心逻辑
+            aiLogic = AILogic.Create(PlayerId, Level); // 创建 Minimax AI 核心逻辑
         }
 
         /// <summary>
@@ -33,24 +31,25 @@ namespace TcgEngine.AI
         public override void Update()
         {
             Game game_data = gameplay.GetGameData();
-            Player player = game_data.GetPlayer(player_id);
+            Player player = game_data.GetPlayer(PlayerId);
+            bool is_player_turn = gameplay.Rules.IsPlayerTurn(player);
 
             // 如果轮到 AI 行动，并且 AI 当前不在执行动作
-            if (!is_playing && gameplay.Rules.IsPlayerTurn(player))
+            if (!isPlaying && is_player_turn)
             {
-                is_playing = true;
+                isPlaying = true;
                 TimeTool.StartCoroutine(AiTurn()); // 启动协程执行 AI 回合
             }
 
             // 如果是选牌阶段（Mulligan）且 AI 不在行动，跳过 Mulligan
-            if (!is_playing && gameplay.Rules.IsPlayerMulliganTurn(player))
+            if (!isPlaying && gameplay.Rules.IsPlayerMulliganTurn(player))
             {
                 SkipMulligan();
             }
 
-            // 如果轮到其他玩家，且 AI 还在运行，则停止 AI
-            if (!gameplay.Rules.IsPlayerTurn(player) && ai_logic.IsRunning())
-                Stop();
+            // 回合已经变化时请求取消；协程继续等待线程安全退出。
+            if (!is_player_turn && aiLogic.IsRunning())
+                aiLogic.Stop();
         }
 
         /// <summary>
@@ -60,38 +59,44 @@ namespace TcgEngine.AI
         {
             yield return new WaitForSeconds(1f); // 等待 1 秒，模拟思考时间
 
+            // 等待期间可能已经切换回合，此时不应再启动搜索。
+            if (!IsPlayerTurn())
+            {
+                isPlaying = false;
+                yield break;
+            }
+
             Game game_data = gameplay.GetGameData();
-            ai_logic.RunAI(game_data); // 运行 Minimax 算法
+            aiLogic.RunAI(game_data); // 运行 Minimax 算法
 
             // 等待 AI 执行完成
-            while (ai_logic.IsRunning())
+            while (aiLogic.IsRunning())
             {
                 yield return new WaitForSeconds(0.1f);
             }
 
             // 获取 AI 认为最优的动作
-            AIAction best = ai_logic.GetBestAction();
+            AIAction best = aiLogic.GetBestAction();
 
-            if (best != null)
+            // 搜索期间也可能切换回合，过期结果不能再提交给真实游戏。
+            if (best != null && IsPlayerTurn())
             {
-                Debug.Log("执行 AI 动作: " + best.GetText(game_data) + "\n" + ai_logic.GetNodePath());
+                Debug.Log("执行 AI 动作: " + best.GetText(game_data) + "\n" + aiLogic.GetNodePath());
 
                 ExecuteAction(best); // 执行动作
             }
 
-            ai_logic.ClearMemory(); // 清理 AI 内存
+            aiLogic.ClearMemory(); // 清理 AI 内存
 
             yield return new WaitForSeconds(0.5f); // 延迟半秒，模拟回合结束
-            is_playing = false;
+            isPlaying = false;
         }
 
-        /// <summary>
-        /// 停止 AI 执行
-        /// </summary>
-        private void Stop()
+        private bool IsPlayerTurn()
         {
-            ai_logic.Stop();
-            is_playing = false;
+            Game game_data = gameplay.GetGameData();
+            Player player = game_data.GetPlayer(PlayerId);
+            return gameplay.Rules.IsPlayerTurn(player);
         }
 
         // ---------- 执行动作相关方法 ----------
@@ -101,7 +106,7 @@ namespace TcgEngine.AI
         /// </summary>
         private void ExecuteAction(AIAction action)
         {
-            if (!CanPlay())
+            if (!CanExecuteAction(action))
                 return;
 
             switch (action.type)
@@ -120,6 +125,27 @@ namespace TcgEngine.AI
                 case GameAction.CancelSelect:    CancelSelect(); break;
                 case GameAction.EndTurn:         EndTurn(); break;
                 case GameAction.Resign:          Resign(); break;
+            }
+        }
+
+        private bool CanExecuteAction(AIAction action)
+        {
+            if (action == null || action.type == GameAction.None)
+                return false;
+
+            switch (action.type)
+            {
+                case GameAction.SelectCard:
+                case GameAction.SelectPlayer:
+                case GameAction.SelectSlot:
+                case GameAction.SelectChoice:
+                case GameAction.SelectCost:
+                case GameAction.CancelSelect:
+                    return CanResolveSelection();
+                case GameAction.SelectMulligan:
+                    return CanMulligan();
+                default:
+                    return CanTakeAction();
             }
         }
 
@@ -249,10 +275,7 @@ namespace TcgEngine.AI
         /// </summary>
         private void CancelSelect()
         {
-            if (CanPlay())
-            {
-                gameplay.CancelSelection();
-            }
+            gameplay.CancelSelection();
         }
 
         /// <summary>
@@ -269,8 +292,11 @@ namespace TcgEngine.AI
         /// </summary>
         private void SelectMulligan(string[] cards)
         {
+            if (!CanMulligan())
+                return;
+
             Game game_data = gameplay.GetGameData();
-            Player player = game_data.GetPlayer(player_id);
+            Player player = game_data.GetPlayer(PlayerId);
             gameplay.Mulligan(player, cards);
         }
 
@@ -279,10 +305,7 @@ namespace TcgEngine.AI
         /// </summary>
         private void EndTurn()
         {
-            if (CanPlay())
-            {
-                gameplay.EndTurn();
-            }
+            gameplay.EndTurn();
         }
 
         /// <summary>
@@ -290,7 +313,7 @@ namespace TcgEngine.AI
         /// </summary>
         private void Resign()
         {
-            int other = player_id == 0 ? 1 : 0;
+            int other = PlayerId == 0 ? 1 : 0;
             gameplay.EndGame(other);
         }
 

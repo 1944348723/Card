@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
@@ -43,12 +44,11 @@ namespace TcgEngine.AI
         private Game original_data;     // 进入 AI 计算时的游戏快照
         private AIHeuristic heuristic;              // 局面评分系统
         private AIActionEvaluator action_evaluator; // 候选动作排序与筛选
-        private Thread ai_thread;       // AI 线程
-
         private NodeState first_node = null; // 根节点
         private NodeState best_move = null;  // 最终最佳决策节点
 
-        private bool running = false;
+        private volatile bool running = false;
+        private volatile bool cancellation_requested = false;
         private int nb_calculated = 0;       // 计算过的节点数量
         private int reached_depth = 0;       // 实际达到的最大搜索深度
 
@@ -92,12 +92,18 @@ namespace TcgEngine.AI
             random_gen = new System.Random();
 
             first_node = null;
+            best_move = null;
             reached_depth = 0;
             nb_calculated = 0;
+            cancellation_requested = false;
             running = true;
 
             // 默认：在子线程执行，避免卡 UI
-            ai_thread = new Thread(Execute);
+            Thread ai_thread = new(Execute)
+            {
+                IsBackground = true,
+                Name = "TCG AI Search"
+            };
             ai_thread.Start();
 
             // 如需 Debug（断点 / Profiler），可以改为主线程执行：
@@ -105,13 +111,11 @@ namespace TcgEngine.AI
         }
 
         /// <summary>
-        /// 停止 AI（终止线程）
+        /// 请求停止 AI 搜索。搜索线程会在安全点退出，并负责更新运行状态。
         /// </summary>
         public void Stop()
         {
-            running = false;
-            if (ai_thread != null && ai_thread.IsAlive)
-                ai_thread.Abort();
+            cancellation_requested = true;
         }
 
         /// <summary>
@@ -119,24 +123,45 @@ namespace TcgEngine.AI
         /// </summary>
         private void Execute()
         {
-            // 创建根节点（当前状态）
-            first_node = CreateNode(null, null, ai_player_id, 0, 0);
-            first_node.hvalue = heuristic.Calculate(original_data, first_node.tdepth);
-            first_node.alpha = int.MinValue;
-            first_node.beta = int.MaxValue;
-
-            Profiler.BeginSample("AI");
             System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+            bool profiler_started = false;
 
-            // 递归搜索
-            CalculateNode(original_data, first_node);
+            try
+            {
+                if (cancellation_requested)
+                    return;
 
-            Debug.Log("AI: Time " + watch.ElapsedMilliseconds + "ms Depth " + reached_depth + " Nodes " + nb_calculated);
-            Profiler.EndSample();
+                // 创建根节点（当前状态）
+                first_node = CreateNode(null, null, ai_player_id, 0, 0);
+                first_node.hvalue = heuristic.Calculate(original_data, first_node.tdepth);
+                first_node.alpha = int.MinValue;
+                first_node.beta = int.MaxValue;
 
-            // 记录最佳路径
-            best_move = first_node.best_child;
-            running = false;
+                Profiler.BeginSample("AI");
+                profiler_started = true;
+
+                // 递归搜索
+                CalculateNode(original_data, first_node);
+
+                if (!cancellation_requested)
+                    best_move = first_node.best_child;
+            }
+            catch (Exception exception)
+            {
+                best_move = null;
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                if (profiler_started)
+                    Profiler.EndSample();
+
+                watch.Stop();
+                Debug.Log("AI: Time " + watch.ElapsedMilliseconds + "ms Depth " + reached_depth + " Nodes " + nb_calculated);
+
+                // 最后写入 volatile 状态，确保主线程随后能看到完整结果。
+                running = false;
+            }
         }
 
         /// <summary>
@@ -144,6 +169,9 @@ namespace TcgEngine.AI
         /// </summary>
         private void CalculateNode(Game data, NodeState node)
         {
+            if (cancellation_requested)
+                return;
+
             Profiler.BeginSample("Add Actions");
             Player player = data.GetPlayer(data.current_player);
 
@@ -205,7 +233,7 @@ namespace TcgEngine.AI
             Profiler.EndSample();
 
             // ----------- 遍历有效动作 → 进入子节点 -------------
-            for (int o = 0; o < action_list.Count; o++)
+            for (int o = 0; o < action_list.Count && !cancellation_requested; o++)
             {
                 AIAction action = action_list[o];
                 if (action.valid && node.alpha < node.beta) // AlphaBeta 剪枝
@@ -285,6 +313,12 @@ namespace TcgEngine.AI
             DoAIAction(ndata, action, player_id);
             Profiler.EndSample();
 
+            if (cancellation_requested)
+            {
+                data_pool.Dispose(ndata);
+                return;
+            }
+
             // ----------- 更新“执行深度” ----------
             bool new_turn = action.type == GameAction.EndTurn;
             int next_tdepth = parent.tdepth;
@@ -316,6 +350,12 @@ namespace TcgEngine.AI
             {
                 // 否则为叶子节点，计算最终启发式得分
                 child_node.hvalue = heuristic.Calculate(ndata, child_node.tdepth);
+            }
+
+            if (cancellation_requested)
+            {
+                data_pool.Dispose(ndata);
+                return;
             }
 
             // ----------- 回溯：更新父节点评价 ----------

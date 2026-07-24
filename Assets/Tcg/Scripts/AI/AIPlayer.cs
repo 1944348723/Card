@@ -1,3 +1,4 @@
+using System;
 using TcgEngine.Gameplay;
 
 namespace TcgEngine.AI
@@ -7,38 +8,61 @@ namespace TcgEngine.AI
     /// </summary>
     public abstract class AIPlayer 
     {
-        public int player_id;   // AI 所控制的玩家 ID
-        public int ai_level;    // AI 等级，可以用来调整难度或搜索深度
+        public int PlayerId { get; }
+        public int Level { get; }
 
-        protected GameLogic gameplay;  // 游戏逻辑对象，用于访问和操作游戏状态
+        protected readonly GameLogic gameplay;
+
+        protected AIPlayer(GameLogic gameplay, int playerId, int level)
+        {
+            this.gameplay = gameplay ?? throw new ArgumentNullException(nameof(gameplay));
+            PlayerId = playerId;
+            Level = level;
+        }
 
         /// <summary>
         /// 每帧或定时调用的更新函数
         /// 子类需要重写此方法实现具体 AI 行为
         /// </summary>
-        public virtual void Update()
+        public abstract void Update();
+
+        /// <summary>
+        /// 是否可以执行出牌、攻击或结束回合等普通回合动作。
+        /// </summary>
+        protected bool CanTakeAction()
         {
-            // 由游戏服务器调用以更新 AI
-            // 重写这个方法来让 AI 执行动作
+            if (gameplay.IsResolving())
+                return false;
+
+            return gameplay.Rules.IsPlayerActionTurn(GetPlayer());
         }
 
         /// <summary>
-        /// 检查 AI 是否可以执行操作
-        /// AI 只能在轮到自己行动或选牌阶段（Mulligan）执行动作，并且游戏当前不在处理动作中
+        /// 是否可以响应当前的目标、卡牌、选项或费用选择器。
         /// </summary>
-        /// <returns>返回 true 表示 AI 可以执行操作</returns>
-        public bool CanPlay()
+        protected bool CanResolveSelection()
         {
-            Game game_data = gameplay.GetGameData();        // 获取当前游戏状态
-            Player player = game_data.GetPlayer(player_id); // 获取 AI 控制的玩家对象
+            if (gameplay.IsResolving())
+                return false;
 
-            // AI 可以操作的条件：
-            // 1. 当前轮到该玩家
-            // 2. 或者正在进行初始选牌阶段（Mulligan）
-            bool can_play = gameplay.Rules.IsPlayerTurn(player) || gameplay.Rules.IsPlayerMulliganTurn(player);
+            return gameplay.Rules.IsPlayerSelectorTurn(GetPlayer());
+        }
 
-            // 同时要求游戏当前不在解决其他动作中
-            return can_play && !gameplay.IsResolving();
+        /// <summary>
+        /// 是否可以提交初始换牌结果。
+        /// </summary>
+        protected bool CanMulligan()
+        {
+            if (gameplay.IsResolving())
+                return false;
+
+            Player player = GetPlayer();
+            return player != null && gameplay.Rules.IsPlayerMulliganTurn(player);
+        }
+
+        protected Player GetPlayer()
+        {
+            return gameplay.GetGameData().GetPlayer(PlayerId);
         }
 
         /// <summary>
@@ -51,11 +75,12 @@ namespace TcgEngine.AI
         /// <returns>返回创建好的 AIPlayer 对象</returns>
         public static AIPlayer Create(AIType type, GameLogic gameplay, int id, int level = 0)
         {
-            if (type == AIType.Random)
-                return new AIPlayerRandom(gameplay, id, level); // 随机 AI
-            if (type == AIType.MiniMax)
-                return new AIPlayerMM(gameplay, id, level);     // 使用 Minimax + alpha-beta 剪枝的 AI
-            return null; // 未知类型返回 null
+            return type switch
+            {
+                AIType.Random => new AIPlayerRandom(gameplay, id, level),
+                AIType.MiniMax => new AIPlayerMM(gameplay, id, level),
+                _ => throw new ArgumentOutOfRangeException(nameof(type), type, "不支持的 AI 类型"),
+            };
         }
     }
 
